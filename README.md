@@ -127,10 +127,15 @@ pip install -r requirements.txt
 
 ### 3. Configuration
 
-Edit: config/server_config.json
+Edit: `config/server_config.json`
 
-You can configure: - Server IP address - Ports - API endpoints - Product
-definitions - Simulation parameters
+You can configure: 
+
+- Server IP address 
+- Ports 
+- API endpoints 
+- Product definitions 
+- Simulation parameters
 
 ------------------------------------------------------------------------
 
@@ -147,7 +152,7 @@ To resume a previous simulation state:
 python server/server.py -l
 ```
 
-Simulation data are stored in: data/
+Simulation data are stored in: `data/`
 
 ------------------------------------------------------------------------
 
@@ -160,9 +165,7 @@ python server/agents/market_maker.py
 python server/agents/liquidity_generator.py
 ```
 
-Custom agents can be implemented in:
-
-client/agents/
+Custom agents can be implemented in: `client/agents/`
 
 ------------------------------------------------------------------------
 
@@ -172,17 +175,13 @@ client/agents/
 python viz/main_page.py
 ```
 
-Access via:
-
-http://`<IP_ADDRESS>`:`<VIZ_PORT>`
+Access via: `http://<IP_ADDRESS>:<VIZ_PORT>`
 
 ------------------------------------------------------------------------
 
 ## Simulation Analysis
 
-Open the reporting notebook:
-
-viz/report/report.ipynb
+Open the reporting notebook: `viz/report/report.ipynb`
 
 The notebook allows:
 
