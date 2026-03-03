@@ -1,107 +1,221 @@
-# Exchange Simulator for the Limit Order-Driven Market
+# Multi-Product Exchange Simulator for an Order-Driven Market
 
-This project is a **modular and extensible exchange simulation platform** designed for studying and evaluating trading strategies within a realistic limit order book (LOB) market environment. It bridges the gap between academic research and practical trading applications.
+A multi-product exchange simulator for a limit order book (LOB) driven
+market.
+
+This project extends the simulator introduced in *Burzovní simulátor pro
+trh řízený limitními objednávkami* (Kimlová, 2025, University of West
+Bohemia).
+
+The objective is to design, implement, secure, and experimentally
+validate a multi-asset exchange simulation platform supporting both
+autonomous and manual trading agents.
 
 ![Web Interface](docs/honicoin_cenzor.png)
 
-## 🔍 Project Overview
+------------------------------------------------------------------------
 
-- Simulates a realistic limit order-driven stock exchange.
-- Enables the integration of both manual and autonomous trading agents.
-- Compatible with a wide variety of algorithmic and machine learning-based strategies.
-- Includes manipulators to study market vulnerabilities.
-- Provides tooling for analyzing simulations and **visual comparison** of trading strategy performance.
+## Project Objectives
 
-## 🧠 Research Objectives
+The project is based on the following principles:
 
-- Analyze and simulate market microstructure dynamics.
-- Evaluate the performance and stability of trading algorithms.
-- Serve as a bridge between theoretical research and real-world application.
-- Study market dynamics and the impact of strategic behaviors on liquidity, stability, and fairness.
-- Use the platform for educational, regulatory, and experimental purposes.
+1.  **Study of existing open-source order-driven exchange simulators**,
+    particularly those based on order book processing.
+2.  **Design and implementation of an extended simulator** that:
+    -   Supports trading of multiple products simultaneously.
+    -   Enables interaction of autonomous (algorithmic) and manual
+        trading agents.
+    -   Allows scalable and distributed deployment.
+3.  **Server security hardening**, ensuring full functionality even when
+    the source code is publicly available.
+4.  **Organization of a student trading competition**, utilizing
+    suitable computing infrastructures (e-INFRA CZ, MetaCentrum),
+    including:
+    -   Collection of simulation data.
+    -   Generation of structured statistical reports.
+    -   Visualization and cross-product comparison of trading strategy
+        performance.
+5.  **Comprehensive documentation** of methodologies, design decisions,
+    and achieved results.
 
-## 💻 Key Features
+------------------------------------------------------------------------
 
-- Modular simulation framework with realistic LOB mechanics.
-- Autonomous agent support including ML-powered strategies.
-- Fraudulent agent simulation for stress-testing market resilience.
-- Web interface powered by **Tornado + Bokeh** for real-time monitoring.
-- Analysis tools using **Jupyter Notebooks** for report generation and visualization.
+## System Architecture
 
-## 🧪 Technologies Used
+The simulator is modular and consists of the following components:
 
-- **Python 3.9 +**
-- **Tornado** (web server)
-- **Bokeh** (web-based visualization)
-- **NumPy**, **Pandas** (data handling)
-- **Jupyter** (result analysis and reporting)
+### Exchange Server
 
-## 🚀 Getting Started
+-   Maintains multiple independent order books (one per product).
+-   Implements a matching engine based on **price-time priority**.
+-   Validates and records incoming orders.
+-   Stores simulation state and transaction history.
 
-### 📦 Clone the Repository
-```bash
-git clone https://github.com/Jivl00/Exchange_simulator_for_the_limit_order-driven_market
-cd Exchange_simulator_for_the_limit_order-driven_market
+### Trading Agents
+
+-   Autonomous algorithmic agents (e.g., market maker, liquidity
+    provider).
+-   Support for custom strategies, including ML-based approaches.
+-   Manual trading interface for interactive participation.
+
+### Visualization Layer
+
+-   Real-time monitoring of market activity.
+-   Order book depth visualization.
+-   Trade history and performance tracking.
+
+### Reporting & Analytics
+
+-   Statistical post-processing of simulation runs.
+-   Comparative analysis of strategies.
+-   Cross-product performance evaluation.
+
+------------------------------------------------------------------------
+
+## Security Considerations
+
+Special emphasis is placed on:
+
+-   Strict separation of server and client logic.
+-   Robust order validation and input sanitization.
+-   Prevention of manipulation through protocol-level safeguards.
+-   Controlled API exposure and configurable access policies.
+-   Ensuring market integrity despite open-source availability.
+
+The system is designed to remain fair, stable, and operational even
+under adversarial conditions.
+
+------------------------------------------------------------------------
+
+## Research & Educational Use
+
+The platform enables:
+
+-   Study of market microstructure.
+-   Analysis of liquidity formation and price dynamics.
+-   Evaluation of trading algorithm stability.
+-   Cross-product strategy comparison.
+-   Organization of educational exchange simulations.
+-   Experimental regulatory and stress-testing scenarios.
+
+------------------------------------------------------------------------
+
+## Technologies Used
+
+-   **Python 3.9+**
+-   **Tornado** (asynchronous web server)
+-   **Bokeh** (interactive visualization)
+-   **NumPy**, **Pandas** (data processing)
+-   **Jupyter Notebook** (analysis & reporting)
+
+------------------------------------------------------------------------
+
+## Getting Started
+
+### 1. Clone the Repository
+
+``` bash
+git clone https://github.com/Jivl00/limit-order-book-simulator
+cd limit-order-book-simulator
 ```
 
-### 📥 Install Dependencies
-```bash
+### 2. Install Dependencies
+
+``` bash
 pip install -r requirements.txt
 ```
 
-### 🔧 Configuration
-Edit `config/server_config.json` to adjust: server IP, ports, and API paths.
+### 3. Configuration
 
-### 🟢 Start the Server
-```bash
+Edit: config/server_config.json
+
+You can configure: - Server IP address - Ports - API endpoints - Product
+definitions - Simulation parameters
+
+------------------------------------------------------------------------
+
+### 4. Start the Exchange Server
+
+``` bash
 cd src
 python server/server.py
 ```
-Once the server is running, start the market simulation components:
 
-```bash
+To resume a previous simulation state:
+
+``` bash
+python server/server.py -l
+```
+
+Simulation data are stored in: data/
+
+------------------------------------------------------------------------
+
+### 5. Run Trading Agents
+
+Example:
+
+``` bash
 python server/agents/market_maker.py
 python server/agents/liquidity_generator.py
 ```
 
-To resume from a previous state:
-```bash
-python server/server.py -l
-```
-- Simulations are saved to `data/` for post-processing after server shutdown.
+Custom agents can be implemented in:
 
-### 👥 Run Market Agents
-Agents are defined in `client/agents`. Start one like this (from the `src` directory):
-```bash
-python client/agents/your_agent.py
-```
+client/agents/
 
-### 🌐 Launch Web Interface
-```bash
+------------------------------------------------------------------------
+
+### 6. Launch the Web Interface
+
+``` bash
 python viz/main_page.py
 ```
-Access the GUI at `http://<IP_ADDRESS>:<VIZ_PORT>` as configured.
 
-### 📊 Analyze Results
+Access via:
+
+http://`<IP_ADDRESS>`:`<VIZ_PORT>`
+
+------------------------------------------------------------------------
+
+## Simulation Analysis
+
 Open the reporting notebook:
-```
+
 viz/report/report.ipynb
-```
-Use it to:
-- Compare strategy performance
-- Analyze trade volume/frequency
-- Summarize outcomes statistically
+
+The notebook allows:
+
+-   Strategy performance comparison
+-   Volume and trade frequency analysis
+-   Statistical summary generation
+-   Visualization of price evolution and liquidity metrics
 
 ![Strategy Comparison](docs/best_traders_plot.png)
 
-### ✅ Run Tests
-```bash
+------------------------------------------------------------------------
+
+## Running Tests
+
+``` bash
 cd tests
 python -m unittest tests.py
 ```
 
-### 📝 Documentation
-- For more information on the web interface and algorithmic trading, refer to the [trading maual](docs/Trading_manual.pdf).
-- Official thesis document detailing the design, implementation, and evaluation of the exchange simulator: [Thesis](docs/dp_2024_25_KIMLOVÁ_Vladimíra.pdf).
-- Official thesis poster: [Poster](docs/DP_poster.pdf).
-- Documentation of the visualization module: [Visualization Documentation](docs/VI.pdf).
+------------------------------------------------------------------------
+
+## Reference
+
+Kimlová, V. (2025).\
+*Burzovní simulátor pro trh řízený limitními objednávkami*.\
+University of West Bohemia, Faculty of Applied Sciences.\
+Supervisor: J. Pospíšil.
+
+------------------------------------------------------------------------
+
+## Documentation
+
+-   Trading manual: docs/Trading_manual.pdf
+-   Thesis document: docs/dp_2024_25_KIMLOVÁ_Vladimíra.pdf
+-   Poster: docs/DP_poster.pdf
+-   Visualization documentation: docs/VI.pdf
