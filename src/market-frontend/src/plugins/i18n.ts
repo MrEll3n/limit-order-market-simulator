@@ -1,21 +1,9 @@
-import { createI18n } from 'vue-i18n'
-
-const messages = {
-  en: {
-    message: {
-      hello: 'hello world',
-    },
-  },
-  ja: {
-    message: {
-      hello: 'こんにちは、世界',
-    },
-  },
-}
+import { createI18n } from 'vue-i18n';
+import messages from '@/i18n';
 
 export default createI18n({
-  legacy: false,
-  locale: 'en',
-  fallbackLocale: 'en',
-  messages,
-})
+    legacy: false,
+    locale: 'en',
+    fallbackLocale: 'en',
+    messages,
+});

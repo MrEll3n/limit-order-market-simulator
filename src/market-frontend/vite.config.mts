@@ -50,6 +50,9 @@ export default defineConfig({
       '.vue',
     ],
   },
+  build: {
+    outDir: 'target/dist',
+  },
   server: {
     port: 3000,
   },
