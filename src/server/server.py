@@ -15,6 +15,7 @@ import logging
 import colorlog
 import time
 import uuid
+import bcrypt
 import argparse
 from itertools import islice
 from sortedcontainers import SortedDict
@@ -28,6 +29,7 @@ from src.order_book.order import Order
 from src.order_book.order_book import OrderBook
 from src.protocols.FIXProtocol import FIXProtocol
 from src.server.db_manager import create_user_db
+from src.server.rest_api import REST_ROUTES, init_rest_api
 
 # Configure logging to use colorlog
 handler = logging.StreamHandler()
@@ -67,6 +69,10 @@ create_user_db(db_path)  # Create the database and table if they don't exist
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 protocol = FIXProtocol("server")
+
+# Stable cookie secret - read from env so it survives restarts.
+# Set COOKIE_SECRET env var in production; falls back to a random value.
+cookie_secret = os.environ.get("COOKIE_SECRET") or os.urandom(32)
 
 
 def product_exists(product):
@@ -504,14 +510,33 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
 def make_app():
     """
     Creates the Tornado web application with the defined URL handlers.
+    Legacy FIX routes are preserved unchanged; REST routes are added under /api/*.
     :return: Tornado web application instance
     """
-    return tornado.web.Application([
-        (r"/", MainHandler),  # Main page - not used for trading
+    # Inject shared state into the REST layer
+    init_rest_api(
+        cursor=cursor,
+        conn=conn,
+        user_manager=user_manager,
+        product_manager=product_manager,
+        products=products,
+        initial_budget=INITIAL_BUDGET,
+        websocket_handler=WebSocketHandler,
+    )
+
+    routes = [
+        # --- Legacy FIX endpoints (bots / algorithmic clients) ---
+        (r"/", MainHandler),
         (f"/{config['TRADING_SESSION']}", TradingHandler),
         (f"/{config['QUOTE_SESSION']}", QuoteHandler),
         (r"/websocket", WebSocketHandler),
-    ], debug=True)
+    ] + REST_ROUTES
+
+    return tornado.web.Application(
+        routes,
+        cookie_secret=cookie_secret,
+        debug=True,
+    )
 
 
 def load_data():
