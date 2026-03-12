@@ -7,7 +7,11 @@ meta {
 patch {
   url: {{baseUrl}}/api/orders/{{orderId}}
   body: json
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
 }
 
 body:json {
@@ -15,4 +19,28 @@ body:json {
     "product": "{{product}}",
     "quantity": 5
   }
+}
+
+docs {
+  ## Modify Order
+
+  Modifies the quantity of an existing open order. Only decreasing quantity is allowed
+  (to preserve price-time priority in the order book).
+
+  **Auth** — Bearer token required
+
+  **Path parameter** — `orderId`
+
+  **Body**
+  | Field    | Type   | Required | Description                          |
+  |----------|--------|----------|--------------------------------------|
+  | product  | string | yes      | Product the order is in              |
+  | quantity | int    | yes      | New quantity — must be less than current |
+
+  **Responses**
+  - `200` — `{ orderId, status: "modified" }`
+  - `422` — quantity not decreased
+  - `403` — order belongs to another user
+  - `404` — order not found
+  - `401` — not authenticated
 }

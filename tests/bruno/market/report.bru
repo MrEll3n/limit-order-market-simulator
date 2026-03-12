@@ -9,3 +9,19 @@ get {
   body: none
   auth: none
 }
+
+docs {
+  ## Report
+
+  Returns historical order book snapshots for a given product. Public — no auth required.
+
+  **Query parameters**
+  | Param       | Type   | Required | Description                              |
+  |-------------|--------|----------|------------------------------------------|
+  | product     | string | yes      | Product name (e.g. `product1`)           |
+  | history_len | int    | no       | Number of past snapshots (-1 = all)      |
+
+  **Responses**
+  - `200` — `{ product, history: [ ...orderBookSnapshots ] }`
+  - `400` — unknown product
+}

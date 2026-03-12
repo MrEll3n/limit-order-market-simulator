@@ -7,5 +7,27 @@ meta {
 get {
   url: {{baseUrl}}/api/account/orders?product={{product}}
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## My Orders
+
+  Returns all active (open) orders for the authenticated user in a given product.
+
+  **Auth** — Bearer token required
+
+  **Query parameters**
+  | Param   | Type   | Required | Description             |
+  |---------|--------|----------|-------------------------|
+  | product | string | yes      | Product to query        |
+
+  **Responses**
+  - `200` — `{ userId, product, orders: { [orderId]: orderDetail } }`
+  - `400` — unknown product
+  - `401` — not authenticated
 }

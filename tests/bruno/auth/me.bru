@@ -1,11 +1,28 @@
 meta {
   name: Me
   type: http
-  seq: 3
+  seq: 4
 }
 
 get {
   url: {{baseUrl}}/api/auth/me
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Me
+
+  Returns the currently authenticated user's info.
+  Useful for checking session validity on app load.
+
+  **Auth** — Bearer token required (`Authorization: Bearer <accessToken>`)
+
+  **Responses**
+  - `200` — `{ email, userId }`
+  - `401` — missing or expired access token
 }

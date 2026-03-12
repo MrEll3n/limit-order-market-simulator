@@ -4,10 +4,20 @@ REST API handlers for the trading server.
 Provides a clean JSON REST interface for the web frontend while keeping
 the existing FIX/WebSocket layer untouched for algorithmic trading clients.
 
+Authentication:
+  JWT access token  — short-lived (15 min), returned in JSON body on login.
+                       Client sends it as:  Authorization: Bearer <token>
+  JWT refresh token — long-lived (7 days), stored in an HttpOnly cookie.
+                       Client calls POST /api/auth/refresh to get a new
+                       access token without re-entering credentials.
+  Refresh tokens are persisted in the SQLite `refresh_tokens` table so they
+  can be revoked on logout.
+
 Routes (all prefixed with /api):
   Auth
     POST   /api/auth/register
     POST   /api/auth/login
+    POST   /api/auth/refresh
     POST   /api/auth/logout
     GET    /api/auth/me
 
@@ -16,24 +26,28 @@ Routes (all prefixed with /api):
     GET    /api/market/orderbook?product=...&depth=...
     GET    /api/market/report?product=...&history_len=...
 
-  Orders  (requires auth cookie)
+  Orders  (requires auth — Bearer token)
     POST   /api/orders                     – place new order
     GET    /api/orders/:order_id?product=… – single order status
     PATCH  /api/orders/:order_id           – modify quantity (decrease only)
     DELETE /api/orders/:order_id?product=… – cancel order
 
-  Account (requires auth cookie)
+  Account (requires auth — Bearer token)
     GET    /api/account/balance?product=…  – budget + balances
     GET    /api/account/orders?product=…   – user's active orders
 """
 
+import asyncio
 import json
 import logging
+import os
+import secrets
 import time
 import uuid
-import asyncio
+from datetime import datetime, timezone
 
 import bcrypt
+import jwt
 import tornado.web
 
 # ---------------------------------------------------------------------------
@@ -49,15 +63,26 @@ _INITIAL_BUDGET = 10000
 _WebSocketHandler = None   # injected to allow broadcasting after REST orders
 _CORS_ORIGIN = "http://localhost:3000"  # Vue dev server; overridden by init_rest_api
 
+# JWT configuration
+_JWT_SECRET: str = ""                    # injected by init_rest_api
+_ACCESS_TOKEN_TTL  = 15 * 60            # 15 minutes  (seconds)
+_REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
+
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
-                  initial_budget, websocket_handler, allowed_origin="http://localhost:3000"):
+                  initial_budget, websocket_handler,
+                  allowed_origin="http://localhost:3000",
+                  jwt_secret: str = ""):
     """
     Inject shared server state so REST handlers use the same objects as the
     FIX handlers.  Call this once from server.py before starting the IOLoop.
+
+    jwt_secret  — HMAC-SHA256 key for signing JWTs.  Pass the value of the
+                   JWT_SECRET environment variable (or a strong random fallback).
     """
     global _cursor, _conn, _user_manager, _product_manager
     global _products, _INITIAL_BUDGET, _WebSocketHandler, _CORS_ORIGIN
+    global _JWT_SECRET
     _cursor = cursor
     _conn = conn
     _user_manager = user_manager
@@ -66,6 +91,7 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _INITIAL_BUDGET = initial_budget
     _WebSocketHandler = websocket_handler
     _CORS_ORIGIN = allowed_origin
+    _JWT_SECRET = jwt_secret or secrets.token_hex(32)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +115,8 @@ class CORSMixin:
             "Access-Control-Allow-Headers",
             "Content-Type, Authorization, X-Requested-With",
         )
+        # Expose Authorization so the browser JS can read it if ever sent as a header
+        self.set_header("Access-Control-Expose-Headers", "Authorization")
 
     def options(self, *args, **kwargs):  # handles pre-flight for all routes
         self.set_status(204)
@@ -111,12 +139,95 @@ def _json_ok(handler, data: dict, status: int = 200):
     handler.finish(json.dumps(data))
 
 
-def _get_authenticated_user(handler):
+# ---------------------------------------------------------------------------
+# JWT helpers
+# ---------------------------------------------------------------------------
+
+def _get_user_role(email: str) -> str:
+    """Returns the role of a user from the database ('user', 'admin', 'bot')."""
+    _cursor.execute("SELECT role FROM users WHERE email=?", (email,))
+    row = _cursor.fetchone()
+    return row[0] if row else "user"
+
+
+def _get_valid_roles() -> list[str]:
+    """Returns all valid role names from the roles table."""
+    _cursor.execute("SELECT name FROM roles ORDER BY name")
+    return [r[0] for r in _cursor.fetchall()]
+
+
+def _create_access_token(email: str) -> str:
     """
-    Returns the email stored in the secure cookie, or None.
+    Returns a signed JWT access token valid for _ACCESS_TOKEN_TTL seconds.
+    Payload: { sub, role, iat, exp, type='access' }
     """
-    raw = handler.get_secure_cookie("user")
-    return raw.decode() if raw else None
+    now = int(time.time())
+    payload = {
+        "sub":  email,
+        "role": _get_user_role(email),
+        "iat":  now,
+        "exp":  now + _ACCESS_TOKEN_TTL,
+        "type": "access",
+    }
+    return jwt.encode(payload, _JWT_SECRET, algorithm="HS256")
+
+
+def _create_refresh_token(email: str) -> str:
+    """
+    Generates a cryptographically random refresh token, persists it in the
+    `refresh_tokens` SQLite table, and returns the token string.
+    """
+    token = secrets.token_urlsafe(48)
+    expires_at = int(time.time()) + _REFRESH_TOKEN_TTL
+    _cursor.execute(
+        "INSERT INTO refresh_tokens (token, email, expires_at, revoked) VALUES (?, ?, ?, 0)",
+        (token, email, expires_at),
+    )
+    _conn.commit()
+    return token
+
+
+def _verify_access_token(handler) -> tuple[str, str] | tuple[None, None]:
+    """
+    Reads the Bearer token from the Authorization header, verifies the
+    signature and expiry, and returns (email, role), or (None, None).
+    """
+    auth_header = handler.request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None, None
+    token = auth_header[len("Bearer "):].strip()
+    try:
+        payload = jwt.decode(token, _JWT_SECRET, algorithms=["HS256"])
+        if payload.get("type") != "access":
+            return None, None
+        return payload["sub"], payload.get("role", "user")
+    except jwt.ExpiredSignatureError:
+        _json_error(handler, 401, "Access token expired")
+        return None, None
+    except jwt.InvalidTokenError:
+        return None, None
+
+
+def _set_refresh_cookie(handler, token: str):
+    """Writes the refresh token into a Secure HttpOnly SameSite=Strict cookie."""
+    is_https = os.environ.get("HTTPS", "false").lower() == "true"
+    handler.set_cookie(
+        "refresh_token",
+        token,
+        httponly=True,
+        secure=is_https,
+        samesite="Strict",
+        max_age=_REFRESH_TOKEN_TTL,
+        path="/api/auth",   # cookie is only sent to auth endpoints
+    )
+
+
+def _revoke_refresh_token(token: str):
+    """Marks a refresh token as revoked in the database."""
+    _cursor.execute(
+        "UPDATE refresh_tokens SET revoked=1 WHERE token=?", (token,)
+    )
+    _conn.commit()
 
 
 def _get_trading_id(email: str):
@@ -128,23 +239,43 @@ def _get_trading_id(email: str):
 
 def _require_auth(handler):
     """
-    Returns (email, trading_uuid) or writes a 401 and returns (None, None).
+    Validates the Bearer access token from the Authorization header.
+    Always sets handler._audit_email and handler._audit_role (even on failure).
+    Returns (email, trading_uuid, role), or writes a 401 and returns (None, None, None).
     """
-    email = _get_authenticated_user(handler)
+    email, role = _verify_access_token(handler)
     if not email:
-        _json_error(handler, 401, "Not authenticated")
-        return None, None
+        handler._audit_role = "unknown"
+        if not handler._finished:
+            _json_error(handler, 401, "Not authenticated")
+        return None, None, None
+
+    handler._audit_email = email
+    handler._audit_role  = role
+
     trading_id = _get_trading_id(email)
     if not trading_id:
-        # User logged in via web but has not obtained a trading UUID yet.
-        # Provision one transparently (same logic as FIX RegisterRequest).
-        _cursor.execute("SELECT * FROM users WHERE email=?", (email,))
+        _cursor.execute("SELECT id FROM users WHERE email=?", (email,))
         if _cursor.fetchone() is None:
             _json_error(handler, 401, "User not found in database")
-            return None, None
+            return None, None, None
         trading_id = str(uuid.uuid4())
         _user_manager.add_user(email, trading_id, _INITIAL_BUDGET)
-    return email, trading_id
+    return email, trading_id, role
+
+
+def _require_role(handler, *allowed_roles: str):
+    """
+    Like _require_auth but additionally enforces that the user's role is in
+    allowed_roles.  Returns (email, trading_uuid, role) or (None, None, None).
+    """
+    email, trading_id, role = _require_auth(handler)
+    if not email:
+        return None, None, None
+    if role not in allowed_roles:
+        _json_error(handler, 403, f"Requires role: {' or '.join(allowed_roles)}")
+        return None, None, None
+    return email, trading_id, role
 
 
 def _update_post_buy_budget(user_id: str):
@@ -171,6 +302,43 @@ def _update_post_sell_volume(user_id: str, product: str):
         if o.side == "sell"
     )
     ob.user_balance[user_id]["post_sell_volume"] = volume - sell_vol
+
+
+# ---------------------------------------------------------------------------
+# Audit log mixin
+# ---------------------------------------------------------------------------
+
+class AuditMixin:
+    """
+    Writes a row to the `audit_log` table after every request finishes.
+    Set self._audit_email and self._audit_role in the handler before finishing.
+    """
+
+    def initialize(self):
+        self._audit_email: str | None = None
+        self._audit_role:  str | None = None
+
+    def on_finish(self):
+        try:
+            _cursor.execute(
+                """
+                INSERT INTO audit_log
+                    (timestamp, email, role, method, path, status_code, ip)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(time.time()),
+                    self._audit_email,
+                    self._audit_role,
+                    self.request.method,
+                    self.request.path,
+                    self.get_status(),
+                    self.request.remote_ip,
+                ),
+            )
+            _conn.commit()
+        except Exception as exc:
+            logging.warning("audit_log write failed: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -245,30 +413,82 @@ class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
             trading_id = str(uuid.uuid4())
             _user_manager.add_user(email, trading_id, _INITIAL_BUDGET)
 
-        self.set_secure_cookie(
-            "user", email,
-            samesite="Lax",
-            secure=os.environ.get("HTTPS", "false").lower() == "true",
+        access_token  = _create_access_token(email)
+        refresh_token = _create_refresh_token(email)
+        _set_refresh_cookie(self, refresh_token)
+
+        _json_ok(self, {
+            "accessToken": access_token,
+            "tokenType":   "Bearer",
+            "expiresIn":   _ACCESS_TOKEN_TTL,
+            "email":       email,
+            "userId":      trading_id,
+        })
+
+
+class AuthRefreshHandler(CORSMixin, tornado.web.RequestHandler):
+    """
+    POST /api/auth/refresh
+    Uses the HttpOnly refresh_token cookie to issue a new access token.
+    Rotates the refresh token on every call (refresh token rotation).
+    """
+
+    def post(self):
+        token = self.get_cookie("refresh_token")
+        if not token:
+            return _json_error(self, 401, "No refresh token")
+
+        now = int(time.time())
+        _cursor.execute(
+            "SELECT email, expires_at, revoked FROM refresh_tokens WHERE token=?",
+            (token,),
         )
-        _json_ok(self, {"email": email, "userId": trading_id})
+        row = _cursor.fetchone()
+        if row is None:
+            return _json_error(self, 401, "Unknown refresh token")
+
+        email, expires_at, revoked = row
+        if revoked:
+            return _json_error(self, 401, "Refresh token has been revoked")
+        if expires_at < now:
+            return _json_error(self, 401, "Refresh token expired")
+
+        # Refresh token rotation — revoke old, issue new
+        _revoke_refresh_token(token)
+        new_refresh = _create_refresh_token(email)
+        _set_refresh_cookie(self, new_refresh)
+
+        access_token = _create_access_token(email)
+        _json_ok(self, {
+            "accessToken": access_token,
+            "tokenType":   "Bearer",
+            "expiresIn":   _ACCESS_TOKEN_TTL,
+        })
 
 
 class AuthLogoutHandler(CORSMixin, tornado.web.RequestHandler):
-    """POST /api/auth/logout"""
+    """POST /api/auth/logout  — revokes the refresh token and clears the cookie"""
 
     def post(self):
-        self.clear_cookie("user")
+        token = self.get_cookie("refresh_token")
+        if token:
+            _revoke_refresh_token(token)
+        self.clear_cookie("refresh_token", path="/api/auth")
         _json_ok(self, {"message": "Logged out"})
 
 
-class AuthMeHandler(CORSMixin, tornado.web.RequestHandler):
-    """GET /api/auth/me  — returns current user info if authenticated"""
+class AuthMeHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """GET /api/auth/me  — returns current user info if Bearer token is valid"""
 
     def get(self):
-        email, trading_id = _require_auth(self)
+        email, trading_id, role = _require_auth(self)
         if not email:
             return
-        _json_ok(self, {"email": email, "userId": trading_id})
+        _json_ok(self, {
+            "email":  email,
+            "userId": trading_id,
+            "role":   role,
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -320,7 +540,7 @@ class MarketReportHandler(CORSMixin, tornado.web.RequestHandler):
 # Orders handlers  (auth required)
 # ---------------------------------------------------------------------------
 
-class OrdersHandler(CORSMixin, tornado.web.RequestHandler):
+class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """
     POST /api/orders   — place a new order
     """
@@ -328,7 +548,7 @@ class OrdersHandler(CORSMixin, tornado.web.RequestHandler):
     def post(self):
         from src.order_book.order import Order
 
-        email, user_id = _require_auth(self)
+        email, user_id, role = _require_auth(self)
         if not email:
             return
 
@@ -408,7 +628,7 @@ class OrdersHandler(CORSMixin, tornado.web.RequestHandler):
         )
 
 
-class OrderDetailHandler(CORSMixin, tornado.web.RequestHandler):
+class OrderDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """
     GET    /api/orders/:order_id?product=…  — order status
     PATCH  /api/orders/:order_id            — modify quantity
@@ -416,7 +636,7 @@ class OrderDetailHandler(CORSMixin, tornado.web.RequestHandler):
     """
 
     def get(self, order_id):
-        email, user_id = _require_auth(self)
+        email, user_id, role = _require_auth(self)
         if not email:
             return
 
@@ -434,7 +654,7 @@ class OrderDetailHandler(CORSMixin, tornado.web.RequestHandler):
         _json_ok(self, order.__json__())
 
     def patch(self, order_id):
-        email, user_id = _require_auth(self)
+        email, user_id, role = _require_auth(self)
         if not email:
             return
 
@@ -470,7 +690,7 @@ class OrderDetailHandler(CORSMixin, tornado.web.RequestHandler):
         _json_ok(self, {"orderId": order_id, "status": "modified"})
 
     def delete(self, order_id):
-        email, user_id = _require_auth(self)
+        email, user_id, role = _require_auth(self)
         if not email:
             return
 
@@ -506,11 +726,11 @@ class OrderDetailHandler(CORSMixin, tornado.web.RequestHandler):
 # Account handlers  (auth required)
 # ---------------------------------------------------------------------------
 
-class AccountBalanceHandler(CORSMixin, tornado.web.RequestHandler):
+class AccountBalanceHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """GET /api/account/balance?product=..."""
 
     def get(self):
-        email, user_id = _require_auth(self)
+        email, user_id, role = _require_auth(self)
         if not email:
             return
 
@@ -539,11 +759,11 @@ class AccountBalanceHandler(CORSMixin, tornado.web.RequestHandler):
         })
 
 
-class AccountOrdersHandler(CORSMixin, tornado.web.RequestHandler):
+class AccountOrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """GET /api/account/orders?product=..."""
 
     def get(self):
-        email, user_id = _require_auth(self)
+        email, user_id, role = _require_auth(self)
         if not email:
             return
 
@@ -561,6 +781,112 @@ class AccountOrdersHandler(CORSMixin, tornado.web.RequestHandler):
 
 
 # ---------------------------------------------------------------------------
+# Admin handlers  (role='admin' required)
+# ---------------------------------------------------------------------------
+
+class AdminUsersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """
+    GET   /api/admin/users            — list all users
+    PATCH /api/admin/users/:email     — change role of a user
+    """
+
+    def get(self):
+        email, _, role = _require_role(self, "admin")
+        if not email:
+            return
+
+        _cursor.execute("SELECT email, role FROM users ORDER BY email")
+        rows = _cursor.fetchall()
+        _json_ok(self, {"users": [{"email": r[0], "role": r[1]} for r in rows]})
+
+
+class AdminUserDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """PATCH /api/admin/users/:email  — { role: 'user'|'admin'|'bot' }"""
+
+    def patch(self, target_email):
+        email, _, role = _require_role(self, "admin")
+        if not email:
+            return
+
+        try:
+            body = json.loads(self.request.body)
+        except json.JSONDecodeError:
+            return _json_error(self, 400, "Invalid JSON")
+
+        new_role = body.get("role", "").strip()
+        valid_roles = _get_valid_roles()
+        if new_role not in valid_roles:
+            return _json_error(self, 400, f"role must be one of: {', '.join(valid_roles)}")
+
+        _cursor.execute("SELECT id FROM users WHERE email=?", (target_email,))
+        if not _cursor.fetchone():
+            return _json_error(self, 404, f"User {target_email} not found")
+
+        _cursor.execute("UPDATE users SET role=? WHERE email=?", (new_role, target_email))
+        _conn.commit()
+        _json_ok(self, {"email": target_email, "role": new_role})
+
+
+class AdminAuditLogHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """
+    GET /api/admin/audit?limit=100&email=...&method=...
+    Returns recent audit log entries, newest first.
+    """
+
+    def get(self):
+        email, _, role = _require_role(self, "admin")
+        if not email:
+            return
+
+        limit        = min(int(self.get_argument("limit", 100)), 1000)
+        filter_email = self.get_argument("email",  None)
+        filter_method= self.get_argument("method", None)
+
+        query  = "SELECT timestamp, email, role, method, path, status_code, ip FROM audit_log"
+        params = []
+        conditions = []
+        if filter_email:
+            conditions.append("email=?")
+            params.append(filter_email)
+        if filter_method:
+            conditions.append("method=?")
+            params.append(filter_method.upper())
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+
+        _cursor.execute(query, params)
+        rows = _cursor.fetchall()
+        entries = [
+            {
+                "timestamp":  r[0],
+                "email":      r[1],
+                "role":       r[2],
+                "method":     r[3],
+                "path":       r[4],
+                "statusCode": r[5],
+                "ip":         r[6],
+            }
+            for r in rows
+        ]
+        _json_ok(self, {"count": len(entries), "entries": entries})
+
+
+class AdminRolesHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """GET /api/admin/roles  — lists all available roles from the roles table"""
+
+    def get(self):
+        email, _, role = _require_role(self, "admin")
+        if not email:
+            return
+
+        _cursor.execute("SELECT name, description FROM roles ORDER BY name")
+        rows = _cursor.fetchall()
+        _json_ok(self, {"roles": [{"name": r[0], "description": r[1]} for r in rows]})
+
+
+# ---------------------------------------------------------------------------
 # Route table  (imported by server.py)
 # ---------------------------------------------------------------------------
 
@@ -568,6 +894,7 @@ REST_ROUTES = [
     # Auth
     (r"/api/auth/register", AuthRegisterHandler),
     (r"/api/auth/login",    AuthLoginHandler),
+    (r"/api/auth/refresh",  AuthRefreshHandler),
     (r"/api/auth/logout",   AuthLogoutHandler),
     (r"/api/auth/me",       AuthMeHandler),
     # Market (public)
@@ -580,4 +907,9 @@ REST_ROUTES = [
     # Account
     (r"/api/account/balance",  AccountBalanceHandler),
     (r"/api/account/orders",   AccountOrdersHandler),
+    # Admin
+    (r"/api/admin/users",            AdminUsersHandler),
+    (r"/api/admin/users/([^/]+)",    AdminUserDetailHandler),
+    (r"/api/admin/audit",            AdminAuditLogHandler),
+    (r"/api/admin/roles",            AdminRolesHandler),
 ]

@@ -1,6 +1,11 @@
 import asyncio
 import os
+import secrets
 import sqlite3
+
+# Load environment variables from .env file (ignored if file does not exist)
+from dotenv import load_dotenv
+load_dotenv()
 import sys
 import glob
 import signal
@@ -73,6 +78,10 @@ protocol = FIXProtocol("server")
 # Stable cookie secret - read from env so it survives restarts.
 # Set COOKIE_SECRET env var in production; falls back to a random value.
 cookie_secret = os.environ.get("COOKIE_SECRET") or os.urandom(32)
+
+# Secret key for signing JWT access tokens.
+# Set JWT_SECRET env var in production; falls back to a strong random value.
+jwt_secret = os.environ.get("JWT_SECRET") or secrets.token_hex(32)
 
 
 def product_exists(product):
@@ -523,6 +532,7 @@ def make_app():
         initial_budget=INITIAL_BUDGET,
         websocket_handler=WebSocketHandler,
         allowed_origin=os.environ.get("CORS_ORIGIN", "http://localhost:3000"),
+        jwt_secret=jwt_secret,
     )
 
     routes = [

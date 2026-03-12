@@ -7,5 +7,30 @@ meta {
 get {
   url: {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Get Order
+
+  Returns the details of a single order. Only the owner can view it.
+
+  **Auth** — Bearer token required
+
+  **Path parameter** — `orderId` (saved automatically after Place Order)
+
+  **Query parameters**
+  | Param   | Type   | Required | Description             |
+  |---------|--------|----------|-------------------------|
+  | product | string | yes      | Product the order is in |
+
+  **Responses**
+  - `200` — order detail object
+  - `403` — order belongs to another user
+  - `404` — order not found
+  - `401` — not authenticated
 }

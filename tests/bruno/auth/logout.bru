@@ -1,11 +1,24 @@
 meta {
   name: Logout
   type: http
-  seq: 4
+  seq: 5
 }
 
 post {
   url: {{baseUrl}}/api/auth/logout
   body: none
   auth: none
+}
+
+docs {
+  ## Logout
+
+  Revokes the refresh token and clears the `refresh_token` cookie.
+  The access token remains valid until it naturally expires (max 15 min).
+  To immediately invalidate access on the client side, discard the token in JS.
+
+  No request body needed. The cookie is sent automatically.
+
+  **Responses**
+  - `200` — `{ message: "Logged out" }`
 }

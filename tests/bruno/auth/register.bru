@@ -17,3 +17,21 @@ body:json {
     "confirmPassword": "heslo123"
   }
 }
+
+docs {
+  ## Register
+
+  Creates a new user account.
+
+  **Body**
+  | Field           | Type   | Required | Description              |
+  |-----------------|--------|----------|--------------------------|
+  | email           | string | yes      | Valid e-mail address      |
+  | password        | string | yes      | Plain-text password       |
+  | confirmPassword | string | yes      | Must match password       |
+
+  **Responses**
+  - `201` — `{ message: "Registration successful" }`
+  - `400` — missing fields, invalid email, passwords don't match
+  - `409` — e-mail already registered
+}

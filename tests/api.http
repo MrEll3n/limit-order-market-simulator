@@ -1,5 +1,7 @@
 @baseUrl = http://localhost:8888
 @product = product1
+# After login, paste the accessToken value from the response here:
+@accessToken = PASTE_ACCESS_TOKEN_HERE
 
 ### ── AUTH ──────────────────────────────────────────────────────────────────
 
@@ -15,7 +17,8 @@ Content-Type: application/json
 
 ###
 
-### Login  (REST Client stores the Set-Cookie automatically)
+### Login — returns { accessToken, tokenType, expiresIn, email, userId }
+###          refresh token is set as HttpOnly cookie automatically
 # @name login
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
@@ -27,12 +30,19 @@ Content-Type: application/json
 
 ###
 
-### Who am I?
-GET {{baseUrl}}/api/auth/me
+### Refresh — exchange refresh_token cookie for a new access token
+###           (refresh token is rotated on every call)
+POST {{baseUrl}}/api/auth/refresh
 
 ###
 
-### Logout
+### Who am I?  (Bearer token required)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Logout — revokes refresh token, clears cookie
 POST {{baseUrl}}/api/auth/logout
 
 ###
@@ -54,12 +64,13 @@ GET {{baseUrl}}/api/market/report?product={{product}}&history_len=10
 
 ###
 
-### ── ORDERS (auth required) ─────────────────────────────────────────────────
+### ── ORDERS (Bearer token required) ────────────────────────────────────────
 
 ### Place a buy order
 # @name newOrder
 POST {{baseUrl}}/api/orders
 Content-Type: application/json
+Authorization: Bearer {{accessToken}}
 
 {
   "product": "{{product}}",
@@ -73,12 +84,14 @@ Content-Type: application/json
 ### Get order detail  (replace ORDER_ID with value from newOrder response)
 @orderId = ORDER_ID
 GET {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+Authorization: Bearer {{accessToken}}
 
 ###
 
 ### Decrease order quantity
 PATCH {{baseUrl}}/api/orders/{{orderId}}
 Content-Type: application/json
+Authorization: Bearer {{accessToken}}
 
 {
   "product": "{{product}}",
@@ -89,17 +102,20 @@ Content-Type: application/json
 
 ### Cancel order
 DELETE {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+Authorization: Bearer {{accessToken}}
 
 ###
 
-### ── ACCOUNT (auth required) ────────────────────────────────────────────────
+### ── ACCOUNT (Bearer token required) ────────────────────────────────────────
 
 ### Balance for product
 GET {{baseUrl}}/api/account/balance?product={{product}}
+Authorization: Bearer {{accessToken}}
 
 ###
 
 ### My active orders
 GET {{baseUrl}}/api/account/orders?product={{product}}
+Authorization: Bearer {{accessToken}}
 
 ###

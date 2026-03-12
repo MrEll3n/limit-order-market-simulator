@@ -7,5 +7,27 @@ meta {
 get {
   url: {{baseUrl}}/api/account/balance?product={{product}}
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Account Balance
+
+  Returns the current budget and share balance for the authenticated user.
+
+  **Auth** — Bearer token required
+
+  **Query parameters**
+  | Param   | Type   | Required | Description             |
+  |---------|--------|----------|-------------------------|
+  | product | string | yes      | Product to query        |
+
+  **Responses**
+  - `200` — `{ userId, email, product, budget, postBuyBudget, currentBalance: { balance, volume, postSellVolume } }`
+  - `400` — unknown product
+  - `401` — not authenticated
 }
