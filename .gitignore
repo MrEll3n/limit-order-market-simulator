@@ -6,3 +6,7 @@
 
 # User database
 src/server/users.db
+
+src/market-frontend/node_modules/
+src/market-frontend/.ruler/
+src/market-frontend/target/
