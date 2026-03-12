@@ -522,6 +522,7 @@ def make_app():
         products=products,
         initial_budget=INITIAL_BUDGET,
         websocket_handler=WebSocketHandler,
+        allowed_origin=os.environ.get("CORS_ORIGIN", "http://localhost:3000"),
     )
 
     routes = [

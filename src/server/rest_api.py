@@ -47,16 +47,17 @@ _product_manager = None
 _products = []
 _INITIAL_BUDGET = 10000
 _WebSocketHandler = None   # injected to allow broadcasting after REST orders
+_CORS_ORIGIN = "http://localhost:3000"  # Vue dev server; overridden by init_rest_api
 
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
-                  initial_budget, websocket_handler):
+                  initial_budget, websocket_handler, allowed_origin="http://localhost:3000"):
     """
     Inject shared server state so REST handlers use the same objects as the
     FIX handlers.  Call this once from server.py before starting the IOLoop.
     """
     global _cursor, _conn, _user_manager, _product_manager
-    global _products, _INITIAL_BUDGET, _WebSocketHandler
+    global _products, _INITIAL_BUDGET, _WebSocketHandler, _CORS_ORIGIN
     _cursor = cursor
     _conn = conn
     _user_manager = user_manager
@@ -64,6 +65,34 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _products = products
     _INITIAL_BUDGET = initial_budget
     _WebSocketHandler = websocket_handler
+    _CORS_ORIGIN = allowed_origin
+
+
+# ---------------------------------------------------------------------------
+# CORS mixin — every REST handler inherits this
+# ---------------------------------------------------------------------------
+
+class CORSMixin:
+    """
+    Sets CORS headers on every response so the Vue dev server (port 3000)
+    can talk to the Tornado backend (port 8888).
+
+    In production both are served from the same origin so CORS is a no-op,
+    but it doesn't hurt to have the headers present.
+    """
+
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", _CORS_ORIGIN)
+        self.set_header("Access-Control-Allow-Credentials", "true")
+        self.set_header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+        self.set_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization, X-Requested-With",
+        )
+
+    def options(self, *args, **kwargs):  # handles pre-flight for all routes
+        self.set_status(204)
+        self.finish()
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +108,6 @@ def _json_error(handler, status: int, message: str):
 def _json_ok(handler, data: dict, status: int = 200):
     handler.set_status(status)
     handler.set_header("Content-Type", "application/json")
-    handler.set_header("Access-Control-Allow-Credentials", "true")
     handler.finish(json.dumps(data))
 
 
@@ -149,15 +177,8 @@ def _update_post_sell_volume(user_id: str, product: str):
 # Auth handlers
 # ---------------------------------------------------------------------------
 
-class AuthRegisterHandler(tornado.web.RequestHandler):
+class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
     """POST /api/auth/register  — { email, password, confirmPassword }"""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
-
-    def options(self):
-        self.set_status(204)
-        self.finish()
 
     def post(self):
         try:
@@ -189,15 +210,8 @@ class AuthRegisterHandler(tornado.web.RequestHandler):
         _json_ok(self, {"message": "Registration successful"}, status=201)
 
 
-class AuthLoginHandler(tornado.web.RequestHandler):
+class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
     """POST /api/auth/login  — { email, password }"""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
-
-    def options(self):
-        self.set_status(204)
-        self.finish()
 
     def post(self):
         try:
@@ -231,30 +245,24 @@ class AuthLoginHandler(tornado.web.RequestHandler):
             trading_id = str(uuid.uuid4())
             _user_manager.add_user(email, trading_id, _INITIAL_BUDGET)
 
-        self.set_secure_cookie("user", email, samesite="Lax")
+        self.set_secure_cookie(
+            "user", email,
+            samesite="Lax",
+            secure=os.environ.get("HTTPS", "false").lower() == "true",
+        )
         _json_ok(self, {"email": email, "userId": trading_id})
 
 
-class AuthLogoutHandler(tornado.web.RequestHandler):
+class AuthLogoutHandler(CORSMixin, tornado.web.RequestHandler):
     """POST /api/auth/logout"""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
-
-    def options(self):
-        self.set_status(204)
-        self.finish()
 
     def post(self):
         self.clear_cookie("user")
         _json_ok(self, {"message": "Logged out"})
 
 
-class AuthMeHandler(tornado.web.RequestHandler):
+class AuthMeHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/auth/me  — returns current user info if authenticated"""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
 
     def get(self):
         email, trading_id = _require_auth(self)
@@ -267,21 +275,15 @@ class AuthMeHandler(tornado.web.RequestHandler):
 # Market data handlers (public — no auth required)
 # ---------------------------------------------------------------------------
 
-class MarketProductsHandler(tornado.web.RequestHandler):
+class MarketProductsHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/market/products"""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
 
     def get(self):
         _json_ok(self, {"products": _products})
 
 
-class MarketOrderBookHandler(tornado.web.RequestHandler):
+class MarketOrderBookHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/market/orderbook?product=...&depth=..."""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
 
     def get(self):
         from sortedcontainers import SortedDict
@@ -300,11 +302,8 @@ class MarketOrderBookHandler(tornado.web.RequestHandler):
         _json_ok(self, {"product": product, "orderBook": ob.jsonify_order_book(censor=True)})
 
 
-class MarketReportHandler(tornado.web.RequestHandler):
+class MarketReportHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/market/report?product=...&history_len=..."""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
 
     def get(self):
         product = self.get_argument("product", None)
@@ -321,17 +320,10 @@ class MarketReportHandler(tornado.web.RequestHandler):
 # Orders handlers  (auth required)
 # ---------------------------------------------------------------------------
 
-class OrdersHandler(tornado.web.RequestHandler):
+class OrdersHandler(CORSMixin, tornado.web.RequestHandler):
     """
     POST /api/orders   — place a new order
     """
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
-
-    def options(self):
-        self.set_status(204)
-        self.finish()
 
     def post(self):
         from src.order_book.order import Order
@@ -416,19 +408,12 @@ class OrdersHandler(tornado.web.RequestHandler):
         )
 
 
-class OrderDetailHandler(tornado.web.RequestHandler):
+class OrderDetailHandler(CORSMixin, tornado.web.RequestHandler):
     """
     GET    /api/orders/:order_id?product=…  — order status
     PATCH  /api/orders/:order_id            — modify quantity
     DELETE /api/orders/:order_id?product=…  — cancel
     """
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
-
-    def options(self, order_id):
-        self.set_status(204)
-        self.finish()
 
     def get(self, order_id):
         email, user_id = _require_auth(self)
@@ -521,11 +506,8 @@ class OrderDetailHandler(tornado.web.RequestHandler):
 # Account handlers  (auth required)
 # ---------------------------------------------------------------------------
 
-class AccountBalanceHandler(tornado.web.RequestHandler):
+class AccountBalanceHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/account/balance?product=..."""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
 
     def get(self):
         email, user_id = _require_auth(self)
@@ -557,11 +539,8 @@ class AccountBalanceHandler(tornado.web.RequestHandler):
         })
 
 
-class AccountOrdersHandler(tornado.web.RequestHandler):
+class AccountOrdersHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/account/orders?product=..."""
-
-    def set_default_headers(self):
-        self.set_header("Content-Type", "application/json")
 
     def get(self):
         email, user_id = _require_auth(self)
