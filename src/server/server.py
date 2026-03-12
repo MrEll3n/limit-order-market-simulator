@@ -2,6 +2,7 @@ import asyncio
 import os
 import secrets
 import sqlite3
+from pathlib import Path
 
 # Load environment variables from .env file (ignored if file does not exist)
 from dotenv import load_dotenv
@@ -51,7 +52,14 @@ handler.setFormatter(colorlog.ColoredFormatter(
 logging.basicConfig(level=logging.ERROR, handlers=[handler])
 logging.getLogger("tornado.access").disabled = True
 
-config = json.load(open("../config/server_config.json"))
+SERVER_DIR = Path(__file__).resolve().parent
+SRC_DIR = SERVER_DIR.parent
+ROOT_DIR = SRC_DIR.parent
+CONFIG_PATH = ROOT_DIR / "config" / "server_config.json"
+DATA_DIR = ROOT_DIR / "data"
+
+with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
+    config = json.load(config_file)
 MSG_SEQ_NUM = 0
 ID = 0
 
@@ -67,7 +75,7 @@ INITIAL_BUDGET = 10000
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
-db_path = "server/users.db"
+db_path = str(SERVER_DIR / "users.db")
 if not os.path.exists(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 create_user_db(db_path)  # Create the database and table if they don't exist
@@ -557,7 +565,7 @@ def load_data():
     global ID
     try:
         # Find the latest pickle file in the data directory
-        list_of_files = glob.glob('../data/*-server_data.pickle')
+        list_of_files = glob.glob(str(DATA_DIR / "*-server_data.pickle"))
         latest_file = max(list_of_files, key=os.path.getctime)
 
         with open(latest_file, 'rb') as f:
@@ -586,7 +594,8 @@ def save_data():
         report = product_manager.get_historical_order_books(product, -1)
         report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
         data_to_save[product] = {"order_books": report, "users": user_manager.users}
-    file_name = "../data/" + time.strftime("%Y-%m-%d_%H-%M-%S") + "-server_data.pickle"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    file_name = str(DATA_DIR / f"{time.strftime('%Y-%m-%d_%H-%M-%S')}-server_data.pickle")
     with open(file_name, 'wb') as f:
         pickle.dump(data_to_save, f)
 
