@@ -1,0 +1,11 @@
+meta {
+  name: Balance
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/account/balance?product={{product}}
+  body: none
+  auth: none
+}

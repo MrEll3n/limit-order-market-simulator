@@ -1,0 +1,11 @@
+meta {
+  name: Cancel Order
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+  body: none
+  auth: none
+}

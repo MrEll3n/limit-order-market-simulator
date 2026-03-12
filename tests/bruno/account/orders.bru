@@ -1,0 +1,11 @@
+meta {
+  name: My Orders
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/account/orders?product={{product}}
+  body: none
+  auth: none
+}

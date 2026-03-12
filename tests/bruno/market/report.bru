@@ -1,0 +1,11 @@
+meta {
+  name: Report
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/market/report?product={{product}}&history_len=10
+  body: none
+  auth: none
+}

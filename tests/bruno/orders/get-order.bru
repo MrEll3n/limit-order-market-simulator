@@ -1,0 +1,11 @@
+meta {
+  name: Get Order
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+  body: none
+  auth: none
+}
