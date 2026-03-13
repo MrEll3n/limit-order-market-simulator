@@ -1,0 +1,27 @@
+meta {
+  name: Order Book
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/market/orderbook?product={{product}}&depth=5
+  body: none
+  auth: none
+}
+
+docs {
+  ## Order Book
+
+  Returns a snapshot of the current order book for a given product. Public — no auth required.
+
+  **Query parameters**
+  | Param   | Type   | Required | Description                                      |
+  |---------|--------|----------|--------------------------------------------------|
+  | product | string | yes      | Product name (e.g. `product1`)                   |
+  | depth   | int    | no       | Number of price levels per side (0 = all levels) |
+
+  **Responses**
+  - `200` — `{ product, orderBook: { bids: {...}, asks: {...} } }`
+  - `400` — unknown product
+}

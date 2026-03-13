@@ -1,0 +1,38 @@
+meta {
+  name: Cancel Order
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Cancel Order
+
+  Removes an open order from the order book.
+
+  **Auth** — Bearer token required
+
+  **Path parameter** — `orderId`
+
+  **Query parameters**
+  | Param   | Type   | Required | Description             |
+  |---------|--------|----------|-------------------------|
+  | product | string | yes      | Product the order is in |
+
+  **Responses**
+  - `200` — `{ orderId, status: "cancelled" }`
+  - `403` — order belongs to another user
+  - `404` — order not found
+  - `401` — not authenticated
+
+  **Side effects** — WebSocket broadcast sent to all connected clients
+}

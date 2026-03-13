@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     Vue({
@@ -55,5 +55,19 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Proxy is active in dev mode only (npm run dev).
+    // In production, Nginx forwards /api and /websocket to Tornado — no proxy needed here.
+    proxy: command === 'serve' ? {
+      '/api': {
+        target: 'http://localhost:8888',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/websocket': {
+        target: 'ws://localhost:8888',
+        ws: true,
+        changeOrigin: true,
+      },
+    } : undefined,
   },
-})
+}))
