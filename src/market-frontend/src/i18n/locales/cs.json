@@ -1,1 +1,128 @@
-{}
+{
+    "loginPage": {
+        "title": "Přihlášení",
+        "fields": {
+            "email": {
+                "label": "Email",
+                "placeholder": "Email"
+            },
+            "password": {
+                "label": "Heslo",
+                "placeholder": "Heslo"
+            }
+        },
+        "actions": {
+            "login": "Přihlásit se",
+            "register": "Registrovat se"
+        },
+        "inputMsgs": {
+            "email": {
+                "required": "E-mail je povinný",
+                "notValid": "E-mail není ve správném formátu"
+            },
+            "password": {
+                "required": "Heslo je povinné",
+                "min": "Heslo musí mít alespoň 8 znaků."
+            }
+        },
+        "toast": {
+            "cooldown": {
+                "label": "Počkejte prosím",
+                "detail": "Zkuste přihlášení znovu za pár sekund."
+            },
+            "success": {
+                "label": "Přihlášení proběhlo úspěšně",
+                "detail": "Za chvíli budete přesměrováni."
+            },
+            "invalidInput": {
+                "label": "Neplatný vstup",
+                "detail": "Zkontrolujte formát e-mailu a hesla."
+            },
+            "authenticationFailed": {
+                "label": "Ověření selhalo",
+                "detail": "Neplatný e-mail nebo heslo."
+            },
+            "forbidden": {
+                "label": "Zakázáno",
+                "detail": "Nemáte oprávnění k přístupu k tomuto zdroji."
+            },
+            "serverError": {
+                "label": "Chyba serveru",
+                "detail": "Zkuste to prosím později."
+            },
+            "requestFailed": {
+                "label": "Požadavek selhal",
+                "detail": "Neočekávaná odpověď serveru."
+            },
+            "networkError": {
+                "label": "Síťová chyba",
+                "detail": "Server se nepodařilo kontaktovat."
+            }
+        },
+        "footer": {
+            "repositoryAriaLabel": "Otevřít GitHub repozitář",
+            "copyright": "Limit Order Market Simulator"
+        }
+    },
+    "registerPage": {
+        "title": "Registrace",
+        "fields": {
+            "email": {
+                "label": "E-mail",
+                "placeholder": "E-mail"
+            },
+            "password": {
+                "label": "Heslo",
+                "placeholder": "Heslo"
+            }
+        },
+        "actions": {
+            "login": "Přihlásit se",
+            "register": "Registrovat se"
+        },
+        "inputMsgs": {
+            "email": {
+                "required": "E-mail je povinný",
+                "notValid": "E-mail není ve správném formátu"
+            },
+            "password": {
+                "required": "Heslo je povinné",
+                "min": "Heslo musí mít alespoň 8 znaků."
+            }
+        },
+        "footer": {
+            "repositoryAriaLabel": "Otevřít GitHub repozitář",
+            "copyright": "Limit Order Market Simulator"
+        },
+        "toast": {
+            "cooldown": {
+                "label": "Počkejte prosím",
+                "detail": "Zkuste registraci znovu za pár sekund."
+            },
+            "success": {
+                "label": "Registrace proběhla úspěšně",
+                "detail": "Za chvíli budete přesměrováni."
+            },
+            "invalidInput": {
+                "label": "Neplatný vstup",
+                "detail": "Zkontrolujte formát e-mailu a hesla."
+            },
+            "conflict": {
+                "label": "Konflikt",
+                "detail": "Uživatel s tímto e-mailem již existuje."
+            },
+            "serverError": {
+                "label": "Chyba serveru",
+                "detail": "Zkuste to prosím později."
+            },
+            "requestFailed": {
+                "label": "Požadavek selhal",
+                "detail": "Neočekávaná odpověď serveru."
+            },
+            "networkError": {
+                "label": "Síťová chyba",
+                "detail": "Server se nepodařilo kontaktovat."
+            }
+        }
+    }
+}

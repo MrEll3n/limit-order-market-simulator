@@ -1,1 +1,128 @@
-{}
+{
+    "loginPage": {
+        "title": "Login",
+        "fields": {
+            "email": {
+                "label": "Email",
+                "placeholder": "Email"
+            },
+            "password": {
+                "label": "Password",
+                "placeholder": "Password"
+            }
+        },
+        "actions": {
+            "login": "Login",
+            "register": "Register"
+        },
+        "inputMsgs": {
+            "email": {
+                "required": "Email is required",
+                "notValid": "Email is not valid"
+            },
+            "password": {
+                "required": "Password is required",
+                "min": "Password must be at least 8 characters."
+            }
+        },
+        "toast": {
+            "cooldown": {
+                "label": "Please wait",
+                "detail": "Try logging in again in a few seconds."
+            },
+            "success": {
+                "label": "Login successful",
+                "detail": "You will be redirected shortly."
+            },
+            "invalidInput": {
+                "label": "Invalid input",
+                "detail": "Please check email and password format."
+            },
+            "authenticationFailed": {
+                "label": "Authentication failed",
+                "detail": "Invalid email or password."
+            },
+            "forbidden": {
+                "label": "Forbidden",
+                "detail": "You are not allowed to access this resource."
+            },
+            "serverError": {
+                "label": "Server error",
+                "detail": "Try again later."
+            },
+            "requestFailed": {
+                "label": "Request failed",
+                "detail": "Unexpected response from server."
+            },
+            "networkError": {
+                "label": "Network error",
+                "detail": "Could not reach server."
+            }
+        },
+        "footer": {
+            "repositoryAriaLabel": "Open GitHub repository",
+            "copyright": "Limit Order Market Simulator"
+        }
+    },
+    "registerPage": {
+        "title": "Register",
+        "fields": {
+            "email": {
+                "label": "Email",
+                "placeholder": "Email"
+            },
+            "password": {
+                "label": "Password",
+                "placeholder": "Password"
+            }
+        },
+        "actions": {
+            "login": "Login",
+            "register": "Register"
+        },
+        "inputMsgs": {
+            "email": {
+                "required": "Email is required",
+                "notValid": "Email is not valid"
+            },
+            "password": {
+                "required": "Password is required",
+                "min": "Password must be at least 8 characters."
+            }
+        },
+        "footer": {
+            "repositoryAriaLabel": "Open GitHub repository",
+            "copyright": "Limit Order Market Simulator"
+        },
+        "toast": {
+            "cooldown": {
+                "label": "Please wait",
+                "detail": "Try registering again in a few seconds."
+            },
+            "success": {
+                "label": "Registration successful",
+                "detail": "You will be redirected shortly."
+            },
+            "invalidInput": {
+                "label": "Invalid input",
+                "detail": "Please check email and password format."
+            },
+            "conflict": {
+                "label": "Conflict",
+                "detail": "User with this email already exists."
+            },
+            "serverError": {
+                "label": "Server error",
+                "detail": "Try again later."
+            },
+            "requestFailed": {
+                "label": "Request failed",
+                "detail": "Unexpected response from server."
+            },
+            "networkError": {
+                "label": "Network error",
+                "detail": "Could not reach server."
+            }
+        }
+    }
+}

@@ -1,15 +1,13 @@
 <script lang="ts" setup>
-    import { useRouter } from 'vue-router'
-    import LoginPage from './LoginPage.vue';
-    import { onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import LoginPage from './LoginPage.vue';
+import { onMounted } from 'vue';
 
-    const router = useRouter();
+const router = useRouter();
 
-    onMounted(() => {
-        router.replace({ name: 'login' });
-    });
+onMounted(() => {
+    router.replace({ name: 'login' });
+});
 </script>
 
-<template>
-    
-</template>
+<template></template>
