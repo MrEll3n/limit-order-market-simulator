@@ -15,7 +15,7 @@ export const useLocaleStore = defineStore('locale', () => {
      */
     const localeToFlagMap: Record<string, string> = {
         cs: 'cz',
-        en: 'gb', 
+        en: 'gb',
     };
 
     /**
@@ -43,9 +43,7 @@ export const useLocaleStore = defineStore('locale', () => {
      */
     function toggleLocale() {
         // find locale and return its index
-        const index: number = availableLocales.findIndex(
-            (current: string) => current == locale.value
-        );
+        const index: number = availableLocales.findIndex((current: string) => current == locale.value);
 
         const nextLocale = availableLocales[(index + 1) % availableLocales.length];
 
@@ -54,10 +52,10 @@ export const useLocaleStore = defineStore('locale', () => {
 
     /**
      * Return flag icon representation of current locale
-     * @returns 
+     * @returns
      */
     function getFlag() {
-        return `fi fi-${localeToFlagMap[locale.value]}`
+        return `fi fi-${localeToFlagMap[locale.value]}`;
     }
 
     /**

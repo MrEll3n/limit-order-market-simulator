@@ -36,6 +36,4 @@ localeStore.initLocale();
 const { initTheme } = useTheme();
 initTheme();
 
-
-
 app.mount('#app');

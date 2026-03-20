@@ -222,11 +222,15 @@ def _set_refresh_cookie(handler, token: str):
     )
 
 
-def _revoke_refresh_token(token: str):
-    """Marks a refresh token as revoked in the database."""
-    _cursor.execute(
-        "UPDATE refresh_tokens SET revoked=1 WHERE token=?", (token,)
-    )
+def _revoke_refresh_token(token: str, email: str | None = None):
+    if email:
+        _cursor.execute(
+            "UPDATE refresh_tokens SET revoked=1 WHERE token=? AND email=?", (token, email)
+        )
+    else:
+        _cursor.execute(
+            "UPDATE refresh_tokens SET revoked=1 WHERE token=?", (token,)
+        )
     _conn.commit()
 
 
@@ -406,6 +410,11 @@ class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
 
         if not match:
             return _json_error(self, 401, "Invalid email or password")
+
+        # Revoke existing refresh token if present
+        existing_token = self.get_cookie("refresh_token")
+        if existing_token:
+            _revoke_refresh_token(existing_token, email)
 
         # Provision trading UUID if not yet in memory
         trading_id = _user_manager.user_name_exists(email)

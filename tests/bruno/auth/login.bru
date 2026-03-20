@@ -17,27 +17,6 @@ body:json {
   }
 }
 
-docs {
-  ## Login
-
-  Authenticates the user and issues a JWT access token + refresh token.
-
-  **Body**
-  | Field    | Type   | Required | Description        |
-  |----------|--------|----------|--------------------|
-  | email    | string | yes      | Registered e-mail  |
-  | password | string | yes      | Plain-text password |
-
-  **Responses**
-  - `200` — `{ accessToken, tokenType: "Bearer", expiresIn: 900, email, userId }`
-  - `400` — missing fields
-  - `401` — invalid credentials
-
-  **Side effects**
-  - Sets `HttpOnly; SameSite=Strict` cookie `refresh_token` (valid 7 days)
-  - Post-response script saves `accessToken` and `userId` to Bruno variables
-}
-
 script:post-response {
   // Save accessToken and userId for use in other requests
   const data = res.getBody();
@@ -47,4 +26,25 @@ script:post-response {
   if (data.userId) {
     bru.setVar("userId", data.userId);
   }
+}
+
+docs {
+  ## Login
+  
+  Authenticates the user and issues a JWT access token + refresh token.
+  
+  **Body**
+  | Field    | Type   | Required | Description        |
+  |----------|--------|----------|--------------------|
+  | email    | string | yes      | Registered e-mail  |
+  | password | string | yes      | Plain-text password |
+  
+  **Responses**
+  - `200` — `{ accessToken, tokenType: "Bearer", expiresIn: 900, email, userId }`
+  - `400` — missing fields
+  - `401` — invalid credentials
+  
+  **Side effects**
+  - Sets `HttpOnly; SameSite=Strict` cookie `refresh_token` (valid 7 days)
+  - Post-response script saves `accessToken` and `userId` to Bruno variables
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Vue
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 // Custom theme switcher
@@ -27,20 +27,23 @@ const tLoginPage = (key: string) => t(`loginPage.${key}`);
 
 // Custom toast handler
 import useToastHandler from '@/composables/useToastHandler';
+import type { LoginResponse, LoginResponseOK } from '@/types';
+import router from '@/router';
 const toast = useToastHandler();
 
-// Cooldown state
+// Cooldown and failed attempts state
 const COOLDOWN_MS = 3000;
 const isCoolingDown = ref(false);
 let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
+const failedAttempts = ref(0);
+const MAX_FAILED_ATTEMPTS = 3;
 
 const startCooldown = () => {
     isCoolingDown.value = true;
-
+    failedAttempts.value = 0; // reset after cooldown
     if (cooldownTimer) {
         clearTimeout(cooldownTimer);
     }
-
     cooldownTimer = setTimeout(() => {
         isCoolingDown.value = false;
         cooldownTimer = null;
@@ -49,6 +52,24 @@ const startCooldown = () => {
 
 onBeforeUnmount(() => {
     if (cooldownTimer) clearTimeout(cooldownTimer);
+});
+
+onMounted(() => {
+    const authDataRaw = localStorage.getItem('auth-data');
+    if (!authDataRaw) return; 
+
+    let authData: LoginResponseOK | undefined;
+    try {
+        authData = JSON.parse(authDataRaw);
+    } catch (e) {
+
+        localStorage.removeItem('auth-data');
+        return;
+    }
+
+    if (!authData!.accessToken) return;
+
+    router.push({ name: 'dashboard' });
 });
 
 // Footer data
@@ -78,7 +99,29 @@ const loginWarn = () => {
     });
 };
 
-const onFormSubmit = (event: FormSubmitEvent) => {
+/**
+ * Calls the `/api/auth/login` endpoint to log in a user.
+ *
+ * @param email User's email
+ * @param password User's password
+ */
+const loginUser = async (email: string, password: string): Promise<LoginResponse> => {
+    const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+    });
+
+    const body: LoginResponse = await res.json().catch(() => ({}) as LoginResponse);
+
+    if (!res.ok) {
+        throw { status: res.status, body };
+    }
+
+    return body;
+};
+
+const onFormSubmit = async (event: FormSubmitEvent) => {
     if (isCoolingDown.value) {
         loginWarn();
         return;
@@ -88,64 +131,69 @@ const onFormSubmit = (event: FormSubmitEvent) => {
 
     const { email, password } = event.values as LoginFormValues;
 
-    startCooldown();
+    try {
+        const body = await loginUser(email, password);
 
-    const args: RequestInit = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-    };
+        if ('accessToken' in body) {
+            localStorage.setItem('auth-data', JSON.stringify(body));
+            failedAttempts.value = 0; // reset after success
+        }
 
-    fetch('/api/auth/login', args)
-        .then(async (res) => {
-            const body: { error?: string } = await res.json().catch(() => ({}));
+        toast.showSuccess({
+            label: tLoginPage('toast.success.label'),
+            detail: tLoginPage('toast.success.detail'),
+        });
 
-            if (res.ok) {
-                toast.showSuccess({
-                    label: tLoginPage('toast.success.label'),
-                    detail: tLoginPage('toast.success.detail'),
-                });
-                return;
-            }
+        router.push('/dashboard');
+    } catch (err: unknown) {
+        failedAttempts.value++;
+        if (failedAttempts.value >= MAX_FAILED_ATTEMPTS) {
+            startCooldown();
+            loginWarn();
+            return;
+        }
+        if (err && typeof err === 'object' && 'status' in err) {
+            const { status, body } = err as { status: number; body: LoginResponse };
+            const errorMessage = 'error' in body ? body.error : undefined;
 
-            switch (res.status) {
+            switch (status) {
                 case 400:
                     toast.showError({
                         label: tLoginPage('toast.invalidInput.label'),
-                        detail: body.error ?? tLoginPage('toast.invalidInput.detail'),
+                        detail: errorMessage ?? tLoginPage('toast.invalidInput.detail'),
                     });
                     break;
                 case 401:
                     toast.showError({
                         label: tLoginPage('toast.authenticationFailed.label'),
-                        detail: body.error ?? tLoginPage('toast.authenticationFailed.detail'),
+                        detail: errorMessage ?? tLoginPage('toast.authenticationFailed.detail'),
                     });
                     break;
                 case 403:
                     toast.showError({
                         label: tLoginPage('toast.forbidden.label'),
-                        detail: body.error ?? tLoginPage('toast.forbidden.detail'),
+                        detail: errorMessage ?? tLoginPage('toast.forbidden.detail'),
                     });
                     break;
                 case 500:
                     toast.showError({
                         label: tLoginPage('toast.serverError.label'),
-                        detail: body.error ?? tLoginPage('toast.serverError.detail'),
+                        detail: errorMessage ?? tLoginPage('toast.serverError.detail'),
                     });
                     break;
                 default:
                     toast.showError({
                         label: tLoginPage('toast.requestFailed.label'),
-                        detail: body.error ?? `Unexpected status: ${res.status}`,
+                        detail: errorMessage ?? `Unexpected status: ${status}`,
                     });
             }
-        })
-        .catch(() => {
+        } else {
             toast.showError({
                 label: tLoginPage('toast.networkError.label'),
                 detail: tLoginPage('toast.networkError.detail'),
             });
-        });
+        }
+    }
 };
 </script>
 
