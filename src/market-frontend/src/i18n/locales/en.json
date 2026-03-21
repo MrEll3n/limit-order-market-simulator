@@ -132,5 +132,10 @@
                 "detail": "Could not reach server."
             }
         }
+    },
+    "dashboardPage": {
+        "actions": {
+            "logout": "Logout"
+        }
     }
 }

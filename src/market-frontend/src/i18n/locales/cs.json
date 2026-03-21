@@ -132,5 +132,10 @@
                 "detail": "Server se nepodařilo kontaktovat."
             }
         }
+    },
+    "dashboardPage": {
+        "actions": {
+            "logout": "Odhlásit"
+        }
     }
 }

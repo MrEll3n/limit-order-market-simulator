@@ -134,7 +134,7 @@ const onFormSubmit = async (event: FormSubmitEvent) => {
             detail: tLoginPage('toast.success.detail'),
         });
 
-        setTimeout(() => router.push({ name: 'dashboard' }), 1000);
+        router.push({ name: 'dashboard' });
     } catch (err: unknown) {
         failedAttempts.value++;
         if (failedAttempts.value >= MAX_FAILED_ATTEMPTS) {
