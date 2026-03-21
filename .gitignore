@@ -1,13 +1,1 @@
-# MacOS directory metadata
 **/.DS_Store
-
-# Python cache
-**/__pycache__
-
-# User database
-src/server/users.db
-
-src/market-frontend/node_modules/
-src/market-frontend/.ruler/
-src/market-frontend/target/
-.env

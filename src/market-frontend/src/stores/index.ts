@@ -1,1 +1,0 @@
-export { useLocaleStore } from './localeStore';
