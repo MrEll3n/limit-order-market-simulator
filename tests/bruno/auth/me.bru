@@ -16,12 +16,12 @@ auth:bearer {
 
 docs {
   ## Me
-
+  
   Returns the currently authenticated user's info.
   Useful for checking session validity on app load.
-
+  
   **Auth** — Bearer token required (`Authorization: Bearer <accessToken>`)
-
+  
   **Responses**
   - `200` — `{ email, userId }`
   - `401` — missing or expired access token

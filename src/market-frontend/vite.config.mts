@@ -2,6 +2,8 @@ import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import Vue from '@vitejs/plugin-vue'
 import Fonts from 'unplugin-fonts/vite'
+import Components from 'unplugin-vue-components/vite'
+import { PrimeVueResolver } from '@primevue/auto-import-resolver'
 import { defineConfig } from 'vite'
 
 // https://vitejs.dev/config/
@@ -9,6 +11,9 @@ export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     Vue(),
+    Components({
+      resolvers: [PrimeVueResolver()],
+    }),
     Fonts({
       fontsource: {
         families: [

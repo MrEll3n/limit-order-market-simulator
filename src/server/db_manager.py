@@ -1,4 +1,7 @@
+import logging
+import os
 import sqlite3
+import bcrypt
 
 def create_user_db(db_path='users.db'):
     """
@@ -70,8 +73,36 @@ def create_user_db(db_path='users.db'):
     ''')
 
     # Insert initial bot accounts (role = 'bot')
-    # Passwords are stored as plaintext here — bot accounts authenticate
-    # via FIX protocol (UUID), not via the REST /api/auth/login endpoint.
+    # Passwords are read from environment variables and stored hashed with bcrypt.
+    bot_password           = os.environ.get("BOT_PASSWORD")
+    market_maker_password  = os.environ.get("MARKET_MAKER_PASSWORD")
+    liquidity_gen_password = os.environ.get("LIQUIDITY_GENERATOR_PASSWORD")
+
+    _DEFAULT = "changeme"
+    missing = [name for name, val in [
+        ("BOT_PASSWORD", bot_password),
+        ("MARKET_MAKER_PASSWORD", market_maker_password),
+        ("LIQUIDITY_GENERATOR_PASSWORD", liquidity_gen_password),
+    ] if not val]
+    if missing:
+        logging.warning(
+            "Bot passwords not set in environment (%s) — using insecure default '%s'.",
+            ", ".join(missing), _DEFAULT,
+        )
+
+    bot_password           = bot_password or _DEFAULT
+    market_maker_password  = market_maker_password or _DEFAULT
+    liquidity_gen_password = liquidity_gen_password or _DEFAULT
+
+    def _hash(plain: str) -> str:
+        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+    bot_passwords = {
+        'market_maker':       _hash(market_maker_password),
+        'liquidity_generator': _hash(liquidity_gen_password),
+    }
+    default_hash = _hash(bot_password)
+
     initial_bots = [
         'market_maker',
         'liquidity_generator',
@@ -94,10 +125,11 @@ def create_user_db(db_path='users.db'):
     ]
 
     for email in initial_bots:
+        hashed = bot_passwords.get(email, default_hash)
         try:
             cursor.execute(
                 "INSERT INTO users (email, password, role) VALUES (?, ?, 'bot')",
-                (email, 'password123'),
+                (email, hashed),
             )
         except sqlite3.IntegrityError:
             # Already exists — make sure role is set to 'bot'
@@ -113,5 +145,7 @@ def create_user_db(db_path='users.db'):
     conn.close()
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     db_path = 'users.db'
     create_user_db(db_path)
