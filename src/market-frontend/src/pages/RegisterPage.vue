@@ -116,7 +116,7 @@ const onFormSubmit = (event: FormSubmitEvent) => {
                     label: tRegisterPage('toast.success.label'),
                     detail: tRegisterPage('toast.success.detail'),
                 });
-                setTimeout(() => router.replace({ name: 'login' }), 2000);
+                setTimeout(() => router.replace({ name: 'login' }), 1000);
                 return;
             }
 
