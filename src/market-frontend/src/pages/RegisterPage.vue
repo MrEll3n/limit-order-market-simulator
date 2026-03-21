@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Vue
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 // PrimeVue
@@ -20,10 +20,13 @@ import Toast from 'primevue/toast';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 import LangSwitcher from '@/components/LangSwitcher.vue';
 import useToastHandler from '@/composables/useToastHandler';
+import useAuth from '@/composables/useAuth';
+import router from '@/router';
 
 const { t } = useI18n();
 const tRegisterPage = (key: string) => t(`registerPage.${key}`);
 const toast = useToastHandler();
+const { getAuthData } = useAuth();
 
 // Cooldown state
 const COOLDOWN_MS = 3000;
@@ -47,6 +50,11 @@ onBeforeUnmount(() => {
     if (cooldownTimer) clearTimeout(cooldownTimer);
 });
 
+onMounted(() => {
+    const authData = getAuthData();
+    if (authData?.accessToken) router.replace({ name: 'dashboard' });
+});
+
 const currentYear = new Date().getFullYear();
 const gitUser = 'MrEll3n';
 const gitRepo = 'limit-order-market-simulator';
@@ -60,6 +68,10 @@ const schema = yup.object({
         .string()
         .required(tRegisterPage('inputMsgs.password.required'))
         .min(8, tRegisterPage('inputMsgs.password.min')),
+    confirmPassword: yup
+        .string()
+        .required(tRegisterPage('inputMsgs.confirmPassword.required'))
+        .oneOf([yup.ref('password')], tRegisterPage('inputMsgs.confirmPassword.match')),
 });
 
 const resolver = yupResolver(schema);
@@ -67,6 +79,7 @@ const resolver = yupResolver(schema);
 type RegisterFormValues = {
     email: string;
     password: string;
+    confirmPassword: string;
 };
 
 const registerWarn = () => {
@@ -84,14 +97,14 @@ const onFormSubmit = (event: FormSubmitEvent) => {
 
     if (!event.valid) return;
 
-    const { email, password } = event.values as RegisterFormValues;
+    const { email, password, confirmPassword } = event.values as RegisterFormValues;
 
     startCooldown();
 
     const args: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, confirmPassword }),
     };
 
     fetch('/api/auth/register', args)
@@ -103,6 +116,7 @@ const onFormSubmit = (event: FormSubmitEvent) => {
                     label: tRegisterPage('toast.success.label'),
                     detail: tRegisterPage('toast.success.detail'),
                 });
+                setTimeout(() => router.replace({ name: 'login' }), 2000);
                 return;
             }
 
@@ -176,6 +190,20 @@ const onFormSubmit = (event: FormSubmitEvent) => {
                             />
                             <Message v-if="$form.password?.invalid" severity="error" size="small" variant="simple">
                                 {{ $form.password.error?.message }}
+                            </Message>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label for="confirmPassword">{{ tRegisterPage('fields.confirmPassword.label') }}</label>
+                            <Password
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                :placeholder="tRegisterPage('fields.confirmPassword.placeholder')"
+                                :feedback="false"
+                                toggleMask
+                                fluid
+                            />
+                            <Message v-if="$form.confirmPassword?.invalid" severity="error" size="small" variant="simple">
+                                {{ $form.confirmPassword.error?.message }}
                             </Message>
                         </div>
                         <div class="flex justify-end">

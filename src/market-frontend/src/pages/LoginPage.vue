@@ -27,9 +27,11 @@ const tLoginPage = (key: string) => t(`loginPage.${key}`);
 
 // Custom toast handler
 import useToastHandler from '@/composables/useToastHandler';
-import type { LoginResponse, LoginResponseOK } from '@/types';
+import useAuth from '@/composables/useAuth';
+import type { LoginResponse } from '@/types';
 import router from '@/router';
 const toast = useToastHandler();
+const { getAuthData } = useAuth();
 
 // Cooldown and failed attempts state
 const COOLDOWN_MS = 3000;
@@ -54,22 +56,10 @@ onBeforeUnmount(() => {
     if (cooldownTimer) clearTimeout(cooldownTimer);
 });
 
+// Check if user is logged in, if so, redirect to dashboard
 onMounted(() => {
-    const authDataRaw = localStorage.getItem('auth-data');
-    if (!authDataRaw) return; 
-
-    let authData: LoginResponseOK | undefined;
-    try {
-        authData = JSON.parse(authDataRaw);
-    } catch (e) {
-
-        localStorage.removeItem('auth-data');
-        return;
-    }
-
-    if (!authData!.accessToken) return;
-
-    router.push({ name: 'dashboard' });
+    const authData = getAuthData();
+    if (authData?.accessToken) router.push({ name: 'dashboard' });
 });
 
 // Footer data
@@ -144,7 +134,7 @@ const onFormSubmit = async (event: FormSubmitEvent) => {
             detail: tLoginPage('toast.success.detail'),
         });
 
-        router.push('/dashboard');
+        setTimeout(() => router.push({ name: 'dashboard' }), 2000);
     } catch (err: unknown) {
         failedAttempts.value++;
         if (failedAttempts.value >= MAX_FAILED_ATTEMPTS) {

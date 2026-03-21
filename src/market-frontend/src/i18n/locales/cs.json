@@ -74,6 +74,10 @@
             "password": {
                 "label": "Heslo",
                 "placeholder": "Heslo"
+            },
+            "confirmPassword": {
+                "label": "Potvrdit heslo",
+                "placeholder": "Potvrdit heslo"
             }
         },
         "actions": {
@@ -88,6 +92,10 @@
             "password": {
                 "required": "Heslo je povinné",
                 "min": "Heslo musí mít alespoň 8 znaků."
+            },
+            "confirmPassword": {
+                "required": "Prosím potvrďte heslo",
+                "match": "Hesla se neshodují"
             }
         },
         "footer": {

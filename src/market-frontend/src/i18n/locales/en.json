@@ -74,6 +74,10 @@
             "password": {
                 "label": "Password",
                 "placeholder": "Password"
+            },
+            "confirmPassword": {
+                "label": "Confirm Password",
+                "placeholder": "Confirm Password"
             }
         },
         "actions": {
@@ -88,6 +92,10 @@
             "password": {
                 "required": "Password is required",
                 "min": "Password must be at least 8 characters."
+            },
+            "confirmPassword": {
+                "required": "Please confirm your password",
+                "match": "Passwords do not match"
             }
         },
         "footer": {

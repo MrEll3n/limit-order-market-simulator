@@ -1,28 +1,15 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import router from '@/router';
-import type { LoginResponseOK } from '@/types';
+import { useI18n } from 'vue-i18n';
+import useAuth from '@/composables/useAuth';
 
-const clearAuthAndRedirect = () => {
-    localStorage.removeItem('auth-data');
-    router.replace({ name: 'login' });
-};
+const { t } = useI18n();
+const tDashboardPage = (key: string) => t(`dashboardPage.${key}`);
+
+const { clearAuthAndRedirect, getAuthData, refreshAccessToken, logout } = useAuth();
 
 onMounted(async () => {
-    const authDataRaw = localStorage.getItem('auth-data');
-    if (!authDataRaw) {
-        router.replace({ name: 'login' });
-        return;
-    }
-
-    let authData: LoginResponseOK | undefined;
-    try {
-        authData = JSON.parse(authDataRaw);
-    } catch {
-        clearAuthAndRedirect();
-        return;
-    }
-
+    const authData = getAuthData();
     if (!authData?.accessToken) {
         clearAuthAndRedirect();
         return;
@@ -33,9 +20,10 @@ onMounted(async () => {
             headers: { Authorization: `Bearer ${authData.accessToken}` },
         });
 
-        if (!res.ok) {
-            clearAuthAndRedirect();
-        }
+        if (res.ok) return;
+
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) clearAuthAndRedirect();
     } catch {
         clearAuthAndRedirect();
     }
@@ -43,5 +31,5 @@ onMounted(async () => {
 </script>
 
 <template>
-
+    <Button :label="tDashboardPage('actions.logout')" @click="logout" />
 </template>
