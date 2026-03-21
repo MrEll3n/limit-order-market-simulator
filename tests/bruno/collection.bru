@@ -1,0 +1,88 @@
+docs {
+  # Limit Order Market Simulator — REST API
+
+  This Bruno collection covers the full REST API of the trading simulator.
+
+  ---
+
+  ## Quick Start
+
+  ### 1. Start the backend
+  ```bash
+  cd /path/to/limit-order-market-simulator
+  python -m src.server.server
+  ```
+  Server runs on **http://localhost:8888**.
+
+  ### 2. Select an environment
+  In Bruno, select the **Local** environment (top-right corner).
+
+  ### 3. Register / Log in
+  Run `auth → Register`, then `auth → Login`.
+  The token is saved automatically into the `{{accessToken}}` variable — all protected requests will use it automatically.
+
+  ---
+
+  ## Authentication
+
+  | Token | Stored in | TTL |
+  |-------|-----------|-----|
+  | **Access token** (JWT) | Bruno variable `accessToken` | 15 minutes |
+  | **Refresh token** | HttpOnly cookie `refresh_token` | 7 days |
+
+  When the access token expires, run `auth → Refresh Token` — you will receive a new token and the cookie is rotated automatically.
+
+  ---
+
+  ## Endpoints
+
+  ### 🔐 Auth
+  | Seq | Request | Method | URL | Auth |
+  |-----|---------|--------|-----|------|
+  | 1 | Register | POST | `/api/auth/register` | — |
+  | 2 | Login | POST | `/api/auth/login` | — |
+  | 3 | Refresh Token | POST | `/api/auth/refresh` | cookie |
+  | 4 | Me | GET | `/api/auth/me` | Bearer |
+  | 5 | Logout | POST | `/api/auth/logout` | cookie |
+
+  ### 📈 Market (public)
+  | Seq | Request | Method | URL |
+  |-----|---------|--------|-----|
+  | 1 | Products | GET | `/api/market/products` |
+  | 2 | Order Book | GET | `/api/market/orderbook?product=&depth=` |
+  | 3 | Report | GET | `/api/market/report?product=&history_len=` |
+
+  ### 📋 Orders (Bearer token required)
+  | Seq | Request | Method | URL |
+  |-----|---------|--------|-----|
+  | 1 | Place Order | POST | `/api/orders` |
+  | 2 | Get Order | GET | `/api/orders/:orderId?product=` |
+  | 3 | Modify Order | PATCH | `/api/orders/:orderId` |
+  | 4 | Cancel Order | DELETE | `/api/orders/:orderId?product=` |
+
+  ### 👤 Account (Bearer token required)
+  | Seq | Request | Method | URL |
+  |-----|---------|--------|-----|
+  | 1 | Balance | GET | `/api/account/balance?product=` |
+  | 2 | My Orders | GET | `/api/account/orders?product=` |
+
+  ---
+
+  ## Variables
+
+  | Variable | Description | Set by |
+  |----------|-------------|--------|
+  | `baseUrl` | Server base URL | Environment (Local / Production) |
+  | `product` | Product name | Environment |
+  | `accessToken` | JWT access token | Automatically after Login / Refresh |
+  | `userId` | User trading UUID | Automatically after Login |
+  | `orderId` | Last placed order ID | Automatically after Place Order |
+
+  ---
+
+  ## Recommended Testing Flow
+
+  ```
+  Register → Login → Products → Order Book → Place Order → Get Order → Modify Order → Cancel Order → Balance → My Orders → Logout
+  ```
+}

@@ -1,0 +1,7 @@
+@layer tailwind-theme;
+@layer tailwind-reset;
+
+@layer primevue;
+@layer app-overrides;
+
+@layer tailwind-utilities;

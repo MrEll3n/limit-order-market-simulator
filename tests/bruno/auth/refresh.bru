@@ -1,0 +1,37 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/auth/refresh
+  body: none
+  auth: none
+}
+
+docs {
+  ## Refresh Token
+
+  Exchanges the `refresh_token` HttpOnly cookie for a new JWT access token.
+  Uses **refresh token rotation** — the old token is revoked and a new cookie is set.
+
+  No request body needed. The cookie is sent automatically by Bruno / browser.
+
+  **Responses**
+  - `200` — `{ accessToken, tokenType: "Bearer", expiresIn: 900 }`
+  - `401` — missing, expired, or revoked refresh token
+
+  **Side effects**
+  - Old refresh token is revoked in the database
+  - New `refresh_token` cookie is set (another 7 days)
+  - Post-response script saves new `accessToken` to Bruno variables
+}
+
+script:post-response {
+  // Save the new accessToken for subsequent requests
+  const data = res.getBody();
+  if (data.accessToken) {
+    bru.setVar("accessToken", data.accessToken);
+  }
+}
