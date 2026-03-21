@@ -1,7 +1,8 @@
-@layer vuetify-overrides {
+@import 'flag-icons/css/flag-icons.min.css';
+
+@layer app-overrides {
     code,
-    pre,
-    .v-code {
+    pre {
         font-family: var(--font-mono);
     }
 }

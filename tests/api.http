@@ -1,0 +1,121 @@
+@baseUrl = http://localhost:8888
+@product = product1
+# After login, paste the accessToken value from the response here:
+@accessToken = PASTE_ACCESS_TOKEN_HERE
+
+### ── AUTH ──────────────────────────────────────────────────────────────────
+
+### Register new user
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "heslo123",
+  "confirmPassword": "heslo123"
+}
+
+###
+
+### Login — returns { accessToken, tokenType, expiresIn, email, userId }
+###          refresh token is set as HttpOnly cookie automatically
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "heslo123"
+}
+
+###
+
+### Refresh — exchange refresh_token cookie for a new access token
+###           (refresh token is rotated on every call)
+POST {{baseUrl}}/api/auth/refresh
+
+###
+
+### Who am I?  (Bearer token required)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Logout — revokes refresh token, clears cookie
+POST {{baseUrl}}/api/auth/logout
+
+###
+
+### ── MARKET (public) ────────────────────────────────────────────────────────
+
+### List products
+GET {{baseUrl}}/api/market/products
+
+###
+
+### Order book snapshot (top 5 levels)
+GET {{baseUrl}}/api/market/orderbook?product={{product}}&depth=5
+
+###
+
+### Trade history (last 10 snapshots)
+GET {{baseUrl}}/api/market/report?product={{product}}&history_len=10
+
+###
+
+### ── ORDERS (Bearer token required) ────────────────────────────────────────
+
+### Place a buy order
+# @name newOrder
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "product": "{{product}}",
+  "side": "buy",
+  "quantity": 10,
+  "price": 100.0
+}
+
+###
+
+### Get order detail  (replace ORDER_ID with value from newOrder response)
+@orderId = ORDER_ID
+GET {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+### Decrease order quantity
+PATCH {{baseUrl}}/api/orders/{{orderId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "product": "{{product}}",
+  "quantity": 5
+}
+
+###
+
+### Cancel order
+DELETE {{baseUrl}}/api/orders/{{orderId}}?product={{product}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+### ── ACCOUNT (Bearer token required) ────────────────────────────────────────
+
+### Balance for product
+GET {{baseUrl}}/api/account/balance?product={{product}}
+Authorization: Bearer {{accessToken}}
+
+###
+
+### My active orders
+GET {{baseUrl}}/api/account/orders?product={{product}}
+Authorization: Bearer {{accessToken}}
+
+###

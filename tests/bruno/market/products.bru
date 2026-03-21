@@ -1,0 +1,20 @@
+meta {
+  name: Products
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/market/products
+  body: none
+  auth: none
+}
+
+docs {
+  ## Products
+
+  Returns the list of all available trading products. Public endpoint — no auth required.
+
+  **Responses**
+  - `200` — `{ products: ["product1", "product2"] }`
+}

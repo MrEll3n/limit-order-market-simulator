@@ -1,7 +1,7 @@
 /**
  * main.ts
  *
- * Bootstraps Vuetify and other plugins then mounts the App`
+ * Bootstraps PrimeVue and other plugins then mounts the app.
  */
 
 // Composables
@@ -18,8 +18,22 @@ import 'unfonts.css';
 import './styles/tailwind.css';
 import './styles/main.scss';
 
-const app = createApp(App);
+// Locales
+import { useLocaleStore } from '@/stores/localeStore';
 
+// Theme
+import { useTheme } from '@/composables/useTheme';
+
+// Create app
+const app = createApp(App);
 registerPlugins(app);
+
+// Initialize locale store
+const localeStore = useLocaleStore();
+localeStore.initLocale();
+
+// Initialize theme
+const { initTheme } = useTheme();
+initTheme();
 
 app.mount('#app');

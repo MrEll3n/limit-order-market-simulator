@@ -1,9 +1,7 @@
 <template>
-    <v-app>
-        <v-main>
-            <router-view />
-        </v-main>
-    </v-app>
+    <div class="min-h-screen">
+        <router-view />
+    </div>
 </template>
 
 <script lang="ts" setup>

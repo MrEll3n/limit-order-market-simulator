@@ -1,0 +1,58 @@
+meta {
+  name: Place Order
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/orders
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "product": "{{product}}",
+    "side": "buy",
+    "quantity": 10,
+    "price": 100.0
+  }
+}
+
+docs {
+  ## Place Order
+
+  Places a new limit order into the order book.
+
+  **Auth** — Bearer token required
+
+  **Body**
+  | Field    | Type   | Required | Description                   |
+  |----------|--------|----------|-------------------------------|
+  | product  | string | yes      | Product name (e.g. product1)  |
+  | side     | string | yes      | `"buy"` or `"sell"`           |
+  | quantity | int    | yes      | Number of shares (> 0)        |
+  | price    | float  | yes      | Limit price per share (> 0)   |
+
+  **Responses**
+  - `201` — `{ orderId, status: "open" | "filled" }`
+  - `422` — insufficient budget / volume, or order rejected
+  - `400` — invalid parameters
+  - `401` — not authenticated
+
+  **Side effects**
+  - Post-response script saves `orderId` to Bruno variables
+  - WebSocket broadcast sent to all connected clients
+}
+
+script:post-response {
+  // Save orderId from response for use in other requests
+  const data = res.getBody();
+  if (data.orderId) {
+    bru.setVar("orderId", data.orderId);
+  }
+}

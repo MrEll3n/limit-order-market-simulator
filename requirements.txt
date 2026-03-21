@@ -9,6 +9,8 @@ colorlog>=6.9.0
 scikit-learn>=1.5.2
 torch>=2.3.0
 bcrypt>=4.3.0
+PyJWT>=2.8.0
+python-dotenv>=1.0.0
 urllib3>=1.26.9
 plotly>=5.20.0
 plotly-resampler

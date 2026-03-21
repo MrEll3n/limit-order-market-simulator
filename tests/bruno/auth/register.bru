@@ -1,0 +1,37 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "test@example.com",
+    "password": "heslo123",
+    "confirmPassword": "heslo123"
+  }
+}
+
+docs {
+  ## Register
+
+  Creates a new user account.
+
+  **Body**
+  | Field           | Type   | Required | Description              |
+  |-----------------|--------|----------|--------------------------|
+  | email           | string | yes      | Valid e-mail address      |
+  | password        | string | yes      | Plain-text password       |
+  | confirmPassword | string | yes      | Must match password       |
+
+  **Responses**
+  - `201` — `{ message: "Registration successful" }`
+  - `400` — missing fields, invalid email, passwords don't match
+  - `409` — e-mail already registered
+}
