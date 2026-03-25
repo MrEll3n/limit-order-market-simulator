@@ -33,7 +33,8 @@ Routes (all prefixed with /api):
     DELETE /api/orders/:order_id?product=… – cancel order
 
   Account (requires auth — Bearer token)
-    GET    /api/account/balance?product=…  – budget + balances
+    GET    /api/account/balance?product=…  – budget + balances for one product
+    GET    /api/account/balance            – budget + balances for all products
     GET    /api/account/orders?product=…   – user's active orders
 """
 
@@ -738,7 +739,10 @@ class OrderDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 # ---------------------------------------------------------------------------
 
 class AccountBalanceHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
-    """GET /api/account/balance?product=..."""
+    """
+    GET /api/account/balance?product=…  – budget + balances for one product
+    GET /api/account/balance            – budget + balances for all products
+    """
 
     def get(self):
         email, user_id, role = _require_auth(self)
@@ -746,27 +750,47 @@ class AccountBalanceHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
             return
 
         product = self.get_argument("product", None)
-        if not product or product not in _products:
-            return _json_error(self, 400, f"Unknown product. Valid: {_products}")
-
         _update_post_buy_budget(user_id)
-        _update_post_sell_volume(user_id, product)
-
-        ob = _product_manager.get_order_book(product, False)
-        current_balance = ob.user_balance[user_id]
         user = _user_manager.users[user_id]
+
+        if product is not None:
+            if product not in _products:
+                return _json_error(self, 400, f"Unknown product. Valid: {_products}")
+
+            _update_post_sell_volume(user_id, product)
+            ob = _product_manager.get_order_book(product, False)
+            cb = ob.user_balance[user_id]
+
+            return _json_ok(self, {
+                "userId": user_id,
+                "email": email,
+                "product": product,
+                "budget": user.budget,
+                "postBuyBudget": user.post_buy_budget,
+                "currentBalance": {
+                    "balance": cb["balance"],
+                    "volume": cb["volume"],
+                    "postSellVolume": cb["post_sell_volume"],
+                },
+            })
+
+        products_balance = {}
+        for p in _products:
+            _update_post_sell_volume(user_id, p)
+            ob = _product_manager.get_order_book(p, False)
+            cb = ob.user_balance[user_id]
+            products_balance[p] = {
+                "balance": cb["balance"],
+                "volume": cb["volume"],
+                "postSellVolume": cb["post_sell_volume"],
+            }
 
         _json_ok(self, {
             "userId": user_id,
             "email": email,
-            "product": product,
             "budget": user.budget,
             "postBuyBudget": user.post_buy_budget,
-            "currentBalance": {
-                "balance": current_balance["balance"],
-                "volume": current_balance["volume"],
-                "postSellVolume": current_balance["post_sell_volume"],
-            },
+            "products": products_balance,
         })
 
 

@@ -471,6 +471,12 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
     clients = set()
     clients_lock = None  # Lock for thread-safe access
 
+    def check_origin(self, origin):
+        """
+        Allow WebSocket connections from any origin.
+        """
+        return True
+
     def open(self):
         """
         Handles new WebSocket connections - adds the client to the subscribed clients.

@@ -11,10 +11,18 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    Avatar: typeof import('primevue/avatar')['default']
     Button: typeof import('primevue/button')['default']
+    Chart: typeof import('primevue/chart')['default']
+    Divider: typeof import('primevue/divider')['default']
+    Fieldset: typeof import('primevue/fieldset')['default']
     LangSwitcher: typeof import('./src/components/LangSwitcher.vue')['default']
+    MenuBar: typeof import('primevue/menubar')['default']
+    Panel: typeof import('primevue/panel')['default']
+    Popover: typeof import('primevue/popover')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ThemeSwitcher: typeof import('./src/components/ThemeSwitcher.vue')['default']
+    TopBar: typeof import('./src/components/TopBar.vue')['default']
   }
 }

@@ -21,6 +21,8 @@
     "@fontsource/roboto-mono": "^5.2.8",
     "@primeuix/themes": "^2.0.3",
     "@primevue/forms": "^4.5.4",
+    "@vueuse/core": "^14.2.1",
+    "chart.js": "^4.5.1",
     "flag-icons": "^7.5.0",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",

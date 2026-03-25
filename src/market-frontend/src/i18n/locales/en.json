@@ -136,6 +136,10 @@
     "dashboardPage": {
         "actions": {
             "logout": "Logout"
+        },
+        "userMenu": {
+            "theme": "Theme",
+            "language": "Language"
         }
     }
 }

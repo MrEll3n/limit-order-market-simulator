@@ -202,7 +202,12 @@ const onFormSubmit = (event: FormSubmitEvent) => {
                                 toggleMask
                                 fluid
                             />
-                            <Message v-if="$form.confirmPassword?.invalid" severity="error" size="small" variant="simple">
+                            <Message
+                                v-if="$form.confirmPassword?.invalid"
+                                severity="error"
+                                size="small"
+                                variant="simple"
+                            >
                                 {{ $form.confirmPassword.error?.message }}
                             </Message>
                         </div>

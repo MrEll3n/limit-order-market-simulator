@@ -1,0 +1,30 @@
+meta {
+  name: Balance (all products)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/account/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Account Balance (all products)
+
+  Returns the current budget and share balances for all products for the authenticated user.
+
+  **Auth** — Bearer token required
+
+  **Query parameters**
+  none
+
+  **Responses**
+  - `200` — `{ userId, email, budget, postBuyBudget, products: { [product]: { balance, volume, postSellVolume } } }`
+  - `401` — not authenticated
+}

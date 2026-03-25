@@ -136,6 +136,10 @@
     "dashboardPage": {
         "actions": {
             "logout": "Odhlásit"
+        },
+        "userMenu": {
+            "theme": "Motiv",
+            "language": "Jazyk"
         }
     }
 }

@@ -26,6 +26,7 @@ const refreshAccessToken = async (): Promise<boolean> => {
         if (!authData) return false;
 
         localStorage.setItem('auth-data', JSON.stringify({ ...authData, accessToken: data.accessToken }));
+        // TODO: maybe add refresh after getting new token
         return true;
     } catch {
         return false;

@@ -1,7 +1,7 @@
 meta {
   name: My Orders
   type: http
-  seq: 2
+  seq: 3
 }
 
 get {
@@ -16,16 +16,16 @@ auth:bearer {
 
 docs {
   ## My Orders
-
+  
   Returns all active (open) orders for the authenticated user in a given product.
-
+  
   **Auth** — Bearer token required
-
+  
   **Query parameters**
   | Param   | Type   | Required | Description             |
   |---------|--------|----------|-------------------------|
   | product | string | yes      | Product to query        |
-
+  
   **Responses**
   - `200` — `{ userId, product, orders: { [orderId]: orderDetail } }`
   - `400` — unknown product
