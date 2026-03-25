@@ -14,6 +14,7 @@ declare module 'vue' {
     Avatar: typeof import('primevue/avatar')['default']
     Button: typeof import('primevue/button')['default']
     Chart: typeof import('primevue/chart')['default']
+    ChartZoomSelect: typeof import('./src/components/ChartZoomSelect.vue')['default']
     Divider: typeof import('primevue/divider')['default']
     Fieldset: typeof import('primevue/fieldset')['default']
     LangSwitcher: typeof import('./src/components/LangSwitcher.vue')['default']
@@ -22,6 +23,7 @@ declare module 'vue' {
     Popover: typeof import('primevue/popover')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SelectButton: typeof import('primevue/selectbutton')['default']
     ThemeSwitcher: typeof import('./src/components/ThemeSwitcher.vue')['default']
     TopBar: typeof import('./src/components/TopBar.vue')['default']
   }

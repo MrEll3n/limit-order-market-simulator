@@ -60,5 +60,5 @@ class TradingProductManager:
         :return: List of historical order books for the specified product.
         """
         if history_length == -1:
-            return self.historical_order_books[product]
+            return list(self.historical_order_books[product])
         return self.historical_order_books[product][-history_length:]

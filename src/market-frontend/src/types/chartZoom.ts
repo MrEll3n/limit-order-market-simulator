@@ -1,0 +1,1 @@
+export type ChartZoom = 'MINUTE' | 'HOUR' | 'ALL'

@@ -3,13 +3,26 @@ import { onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
 import { useWebSocket } from '@vueuse/core';
+import Plotly from 'plotly.js-dist';
+import { type ChartZoom } from '@/types'
+import { SelectButton } from 'primevue';
 
 const { t } = useI18n();
 const tDashboardPage = (key: string) => t(`dashboardPage.${key}`);
 
 const { clearAuthAndRedirect, getAuthData, refreshAccessToken, logout } = useAuth();
 
-// ── Types ──────────────────────────────────────────────────────────
+// Chart
+const selectedProduct = ref<string>();
+const chartZoomSelect = ref<ChartZoom>('MINUTE');
+
+const chartZoomSelectOpts = ref([
+    { name: 'Minute', value: 'MINUTE' },
+    { name: 'Hour', value: 'HOUR' },
+    { name: 'All', value: 'ALL' }
+]);
+
+// Types
 type OrderBookEntry = {
     ID: string;
     User: string;
@@ -32,7 +45,8 @@ type MarketReportResponse = {
     history: string[]; // each item is a JSON-serialised OrderBookSnapshot
 };
 
-// ── FIX protocol parser ────────────────────────────────────────────
+
+// FIX protocol parser
 // Messages are FIX 4.4 encoded: fields separated by \x01, format tag=value
 const decoder = new TextDecoder();
 
@@ -46,7 +60,7 @@ const parseFIX = (raw: string): Record<string, string> => {
     return fields;
 };
 
-// ── WebSocket ──────────────────────────────────────────────────────
+// WebSocket
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${wsProtocol}//${window.location.host}/websocket`;
 
@@ -59,75 +73,95 @@ const { data: wsData, open: wsOpen } = useWebSocket(wsUrl, {
 });
 
 // ── Price chart ────────────────────────────────────────────────────
-const MAX_POINTS = 100;
+const MAX_POINTS = 1000;
+const plotDiv = ref<HTMLDivElement | null>(null);
+let plotInitialized = false;
+let lastBid: number | null = null;
+let lastAsk: number | null = null;
+const rawHistory = ref<OrderBookSnapshot[]>([]);
 
-const chartData = ref({
-    labels: [] as string[],
-    datasets: [
-        {
-            label: 'Best Bid',
-            data: [] as (number | null)[],
-            borderColor: '#22c55e',
-            backgroundColor: 'rgba(34,197,94,0.08)',
-            fill: false,
-            tension: 0.2,
-            pointRadius: 0,
-            borderWidth: 2,
-        },
-        {
-            label: 'Best Ask',
-            data: [] as (number | null)[],
-            borderColor: '#ef4444',
-            backgroundColor: 'rgba(239,68,68,0.08)',
-            fill: false,
-            tension: 0.2,
-            pointRadius: 0,
-            borderWidth: 2,
-        },
-    ],
-});
+const plotLayout: Partial<Plotly.Layout> = {
+    margin: { t: 10, r: 10, b: 40, l: 50 },
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    font: { color: '#9ca3af' },
+    xaxis: {
+        showgrid: false,
+        tickfont: { size: 11 },
+        nticks: 6,
+    },
+    yaxis: {
+        gridcolor: 'rgba(128,128,128,0.15)',
+        tickfont: { size: 11 },
+        zerolinecolor: 'rgba(128,128,128,0.2)',
+    },
+    legend: { orientation: 'h', y: 1.12, x: 0 },
+    hovermode: 'x unified',
+};
 
-const chartOptions = ref({
+const plotConfig: Partial<Plotly.Config> = {
     responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: {
-        legend: {
-            position: 'top' as const,
-            labels: { usePointStyle: true, pointStyleWidth: 10, boxHeight: 6 },
-        },
-        tooltip: {
-            mode: 'index' as const,
-            intersect: false,
-            callbacks: {
-                title: (items: { label: string }[]) => items[0]?.label ?? '',
-            },
-        },
-    },
-    scales: {
-        x: {
-            ticks: {
-                maxTicksLimit: 6,
-                maxRotation: 0,
-            },
-        },
-        y: { grid: { color: 'rgba(128,128,128,0.1)' } },
-    },
-    interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
-});
+    displayModeBar: false,
+};
 
-// Appends one point to the chart, keeping at most MAX_POINTS points
+const plotFromHistory = (snapshots: OrderBookSnapshot[]) => {
+    const now = Date.now();
+    const cutoff = chartZoomSelect.value === 'MINUTE' ? now - 60_000
+        : chartZoomSelect.value === 'HOUR' ? now - 3_600_000
+        : 0;
+
+    const filtered = snapshots.filter(s => {
+        const ts = s.Timestamp > 0 ? s.Timestamp / 1_000_000 : now;
+        return ts >= cutoff;
+    });
+
+    const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    const labels = filtered.map(s => new Date(s.Timestamp > 0 ? s.Timestamp / 1_000_000 : now).toLocaleTimeString([], timeOpts));
+    const bids = filtered.map(s => s.Bids?.[0]?.Price ?? null);
+    const asks = filtered.map(s => s.Asks?.[0]?.Price ?? null);
+
+    initPlot(labels, bids, asks);
+};
+
+watch(chartZoomSelect, () => plotFromHistory(rawHistory.value));
+
+const initPlot = (labels: string[], bids: (number | null)[], asks: (number | null)[]) => {
+    if (!plotDiv.value) return;
+    const traces: Plotly.Data[] = [
+        {
+            name: 'Best Bid',
+            x: labels,
+            y: bids,
+            type: 'scatter',
+            mode: 'lines',
+            line: { color: '#22c55e', width: 2, shape: 'spline', smoothing: 0.3 },
+            connectgaps: false,
+        },
+        {
+            name: 'Best Ask',
+            x: labels,
+            y: asks,
+            type: 'scatter',
+            mode: 'lines',
+            line: { color: '#ef4444', width: 2, shape: 'spline', smoothing: 0.3 },
+            connectgaps: false,
+        },
+    ];
+    Plotly.newPlot(plotDiv.value, traces, plotLayout, plotConfig);
+    plotInitialized = true;
+};
+
 const appendChartPoint = (timestamp: string, bestBid: number | null, bestAsk: number | null) => {
-    const labels = [...chartData.value.labels, timestamp].slice(-MAX_POINTS);
-    const bids = [...chartData.value.datasets[0].data, bestBid].slice(-MAX_POINTS);
-    const asks = [...chartData.value.datasets[1].data, bestAsk].slice(-MAX_POINTS);
-    chartData.value = {
-        labels,
-        datasets: [
-            { ...chartData.value.datasets[0], data: bids },
-            { ...chartData.value.datasets[1], data: asks },
-        ],
-    };
+    if (!plotDiv.value || !plotInitialized) return;
+    if (bestBid !== null) lastBid = bestBid;
+    if (bestAsk !== null) lastAsk = bestAsk;
+    if (lastBid === null || lastAsk === null) return;
+    Plotly.extendTraces(
+        plotDiv.value,
+        { x: [[timestamp], [timestamp]], y: [[lastBid], [lastAsk]] },
+        [0, 1],
+        MAX_POINTS,
+    );
 };
 
 // Process incoming WebSocket message
@@ -148,7 +182,9 @@ watch(wsData, (raw) => {
 
         const bestBid: number | null = orderBook.Bids?.[0]?.Price ?? null;
         const bestAsk: number | null = orderBook.Asks?.[0]?.Price ?? null;
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const time = orderBook.Timestamp > 0
+            ? new Date(orderBook.Timestamp / 1_000_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         appendChartPoint(time, bestBid, bestAsk);
     } catch {
         // malformed message — ignore
@@ -156,9 +192,9 @@ watch(wsData, (raw) => {
 });
 
 // Initial history from REST API
-const fetchChartHistory = async () => {
+const fetchChartHistory = async (product: string, historyLength: number = -1) => {
     try {
-        const res = await fetch('/api/market/report?product=product1&history_len=60');
+        const res = await fetch(`/api/market/report?product=${product}&history_len=${historyLength}`);
         if (!res.ok) return;
         const { history } = (await res.json()) as MarketReportResponse;
 
@@ -166,24 +202,18 @@ const fetchChartHistory = async () => {
         const bids: (number | null)[] = [];
         const asks: (number | null)[] = [];
 
-        const now = Date.now();
         const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
 
-        history.forEach((snapshotStr, i) => {
+        history.forEach((snapshotStr) => {
             const snapshot = JSON.parse(snapshotStr) as OrderBookSnapshot;
-            const msAgo = (history.length - 1 - i) * 2000;
-            labels.push(new Date(now - msAgo).toLocaleTimeString([], timeOpts));
+            const ts = snapshot.Timestamp > 0 ? snapshot.Timestamp / 1_000_000 : Date.now();
+            labels.push(new Date(ts).toLocaleTimeString([], timeOpts));
             bids.push(snapshot.Bids?.[0]?.Price ?? null);
             asks.push(snapshot.Asks?.[0]?.Price ?? null);
         });
 
-        chartData.value = {
-            labels,
-            datasets: [
-                { ...chartData.value.datasets[0], data: bids },
-                { ...chartData.value.datasets[1], data: asks },
-            ],
-        };
+        rawHistory.value = history.map(s => JSON.parse(s) as OrderBookSnapshot);
+        initPlot(labels, bids, asks);
     } catch {
         // server not ready yet
     }
@@ -213,7 +243,7 @@ onMounted(async () => {
         return;
     }
 
-    await fetchChartHistory();
+    await fetchChartHistory(selectedProduct.value ?? 'product1');
     wsOpen();
 });
 </script>
@@ -227,9 +257,13 @@ onMounted(async () => {
                 <Fieldset legend="Active Orders" class="h-9/12 grow"> </Fieldset>
                 <Fieldset legend="Trading Details" class="h-3/12 grow"></Fieldset>
             </div>
+
             <div class="w-6/12 flex flex-col overflow-y-auto">
                 <Fieldset legend="Price Chart" class="">
-                    <Chart type="line" :data="chartData" :options="chartOptions" class="h-74 w-full" />
+                    <div ref="plotDiv" class="h-74 w-full" />
+                    <div class="flex flex-row justify-left gap-4">
+                        <SelectButton v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
+                    </div>
                 </Fieldset>
                 <Fieldset legend="Order Book" class="grow"></Fieldset>
                 <Fieldset legend="Order History" class="grow"></Fieldset>

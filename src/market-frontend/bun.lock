@@ -13,6 +13,7 @@
         "chart.js": "^4.5.1",
         "flag-icons": "^7.5.0",
         "pinia": "^3.0.4",
+        "plotly.js-dist": "^3.4.0",
         "primeicons": "^7.0.0",
         "primevue": "^4.5.4",
         "vue": "^3.5.30",
@@ -26,6 +27,7 @@
         "@tailwindcss/vite": "^4.2.2",
         "@tsconfig/node22": "^22.0.5",
         "@types/node": "^25.5.0",
+        "@types/plotly.js": "^3.0.10",
         "@vitejs/plugin-vue": "^6.0.5",
         "@vue/tsconfig": "^0.9.0",
         "eslint": "^10.0.3",
@@ -243,6 +245,8 @@
     "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
 
     "@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw=="],
+
+    "@types/plotly.js": ["@types/plotly.js@3.0.10", "", {}, "sha512-q+MgO4aajC2HrO7FllTYWzrpdfbTjboSMfjkz/aXKjg1v7HNo1zMEFfAW7quKfk6SL+bH74A5ThBEps/7hZxOA=="],
 
     "@types/web-bluetooth": ["@types/web-bluetooth@0.0.21", "", {}, "sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA=="],
 
@@ -529,6 +533,8 @@
     "pinia": ["pinia@3.0.4", "", { "dependencies": { "@vue/devtools-api": "^7.7.7" }, "peerDependencies": { "typescript": ">=4.5.0", "vue": "^3.5.11" }, "optionalPeers": ["typescript"] }, "sha512-l7pqLUFTI/+ESXn6k3nu30ZIzW5E2WZF/LaHJEpoq6ElcLD+wduZoB2kBN19du6K/4FDpPMazY2wJr+IndBtQw=="],
 
     "pkg-types": ["pkg-types@2.3.0", "", { "dependencies": { "confbox": "^0.2.2", "exsolve": "^1.0.7", "pathe": "^2.0.3" } }, "sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig=="],
+
+    "plotly.js-dist": ["plotly.js-dist@3.4.0", "", {}, "sha512-oyZNbxfmDTELsV5p4HD4cLWzsIu8w68/cjkde2mxT74gN5pQX7fseEFcpXxPo22RuSOxlP86bG4fj9C1RJNkWQ=="],
 
     "postcss": ["postcss@8.5.8", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg=="],
 

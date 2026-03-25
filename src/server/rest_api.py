@@ -543,7 +543,7 @@ class MarketReportHandler(CORSMixin, tornado.web.RequestHandler):
             return _json_error(self, 400, f"Unknown product. Valid: {_products}")
 
         history_len = int(self.get_argument("history_len", -1))
-        report = _product_manager.get_historical_order_books(product, history_len)
+        report = list(_product_manager.get_historical_order_books(product, history_len))
         report.append(_product_manager.get_order_book(product, False).copy().jsonify_order_book())
         _json_ok(self, {"product": product, "history": report})
 

@@ -483,6 +483,11 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.__class__.clients.add(self)
         logging.info("New WebSocket connection")
+        for product in products:
+            snapshot = protocol.encode(
+                {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(censor=True),
+                 "product": product, "msg_type": "MarketDataSnapshot"})
+            self.write_message(json.dumps({"message": snapshot.decode()}))
 
     def on_close(self):
         """
@@ -516,7 +521,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
                     closed_clients.add(client)
                     continue
                 try:
-                    await client.write_message(message_data)
+                    await client.write_message(json.dumps(message_data))
                 except tornado.websocket.WebSocketClosedError:
                     logging.error("WebSocketClosedError during broadcast")
                     closed_clients.add(client)
