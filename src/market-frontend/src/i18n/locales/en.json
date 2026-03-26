@@ -140,6 +140,26 @@
         "userMenu": {
             "theme": "Theme",
             "language": "Language"
+        },
+        "panels": {
+            "activeOrders": "Active Orders",
+            "tradingDetails": "Trading Details",
+            "priceChart": "Price Chart",
+            "orderBook": "Order Book",
+            "orderHistory": "Order History",
+            "tradingPanel": "Trading Panel"
+        },
+        "chart": {
+            "zoom": {
+                "minute": "Minute",
+                "hour": "Hour",
+                "all": "All"
+            },
+            "selectProduct": "Select product"
+        },
+        "metrics": {
+            "midPrice": "Mid Price",
+            "imbalance": "Imbalance"
         }
     }
 }

@@ -140,6 +140,26 @@
         "userMenu": {
             "theme": "Motiv",
             "language": "Jazyk"
+        },
+        "panels": {
+            "activeOrders": "Aktivní objednávky",
+            "tradingDetails": "Detaily obchodování",
+            "priceChart": "Cenový graf",
+            "orderBook": "Kniha objednávek",
+            "orderHistory": "Historie objednávek",
+            "tradingPanel": "Obchodní panel"
+        },
+        "chart": {
+            "zoom": {
+                "minute": "Minuta",
+                "hour": "Hodina",
+                "all": "Vše"
+            },
+            "selectProduct": "Vybrat produkt"
+        },
+        "metrics": {
+            "midPrice": "Střední cena",
+            "imbalance": "Nerovnováha"
         }
     }
 }
