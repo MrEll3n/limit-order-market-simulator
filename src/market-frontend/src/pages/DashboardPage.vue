@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
 import { useWebSocket } from '@vueuse/core';
@@ -274,11 +274,12 @@ const fetchChartHistory = async (product: string, historyLength: number = -1) =>
         const { history } = (await res.json()) as MarketReportResponse;
 
         rawHistory.value = history.map(s => JSON.parse(s) as OrderBookSnapshot);
-        plotFromHistory(rawHistory.value);
     } catch {
         // server not ready yet
     } finally {
         loadingChart.value = false;
+        await nextTick();
+        plotFromHistory(rawHistory.value);
     }
 };
 

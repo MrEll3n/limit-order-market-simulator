@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
+import { usePageReady } from '@/composables/usePageReady';
 import { useAccountStore } from '@/stores';
 import { storeToRefs } from 'pinia';
 import Popover from 'primevue/popover';
-import { usePageReady } from '@/composables/usePageReady';
 
 const { t } = useI18n();
 const tDashboardPage = (key: string) => t(`dashboardPage.${key}`);
 
 const { logout } = useAuth();
+const { pageReady } = usePageReady();
 
 const accountStore = useAccountStore();
 const { user, balance } = storeToRefs(accountStore);
-const { pageReady } = usePageReady();
 
 const op = ref<InstanceType<typeof Popover> | null>(null);
 const togglePopover = (event: MouseEvent) => {
