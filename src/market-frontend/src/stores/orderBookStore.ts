@@ -55,8 +55,11 @@ export const useOrderBookStore = defineStore('orderBook', () => {
         try {
             const res = await fetch(`/api/market/orderbook?product=${product}`);
             if (!res.ok) return;
-            const data = await res.json() as { orderBook: OrderBookSnapshot };
-            applySnapshot(data.orderBook);
+            const data = await res.json() as { orderBook: OrderBookSnapshot | string };
+            const snapshot = typeof data.orderBook === 'string'
+                ? JSON.parse(data.orderBook) as OrderBookSnapshot
+                : data.orderBook;
+            applySnapshot(snapshot);
         } catch {
             error.value = true;
         }
