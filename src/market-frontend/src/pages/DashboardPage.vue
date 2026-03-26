@@ -314,14 +314,16 @@ onMounted(async () => {
 
 <template>
     <div class="h-screen flex flex-col overflow-hidden gap-3 pb-3">
-        <TopBar />
+        <TopBar class="mx-3 mt-3" />
         <!-- Main View -->
         <div class="flex-1 flex flex-row overflow-hidden gap-3 mx-3">
             <div class="w-3/12 flex flex-col overflow-y-auto">
+                <!-- Active Orders -->
                 <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset h-9/12 grow">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" class="h-full w-full" />
                 </Fieldset>
+                <!-- Trading Details -->
                 <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="h-3/12 grow">
                     <div class="flex flex-col gap-1 text-sm">
                         <div class="flex justify-between items-center">
@@ -341,21 +343,27 @@ onMounted(async () => {
             </div>
 
             <div class="w-6/12 flex flex-col overflow-y-auto">
+                <!-- Price Chart -->
                 <Fieldset :legend="tDashboardPage('panels.priceChart')">
                     <Skeleton v-if="!pageReady" width="100%" height="18.5rem" />
                     <div v-show="pageReady" ref="plotDiv" class="h-74 w-full" />
                     <div class="flex flex-row justify-between mt-2">
-                        <SelectButton v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
+                        <Skeleton v-if="!pageReady" width="13rem" height="2.5rem" />
+                        <SelectButton v-else v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
                         <Skeleton v-if="!pageReady" width="10rem" height="2rem" />
                         <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
                     </div>
                 </Fieldset>
+                <!-- Order Book -->
                 <Fieldset :legend="tDashboardPage('panels.orderBook')" class="grow"></Fieldset>
+                <!-- Order History -->
                 <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="grow"></Fieldset>
             </div>
 
             <div class="w-3/12 flex flex-col overflow-y-auto">
+                <!-- Trading Panel -->
                 <Fieldset :legend="tDashboardPage('panels.tradingPanel')" class="h-9/12 grow"> </Fieldset>
+                <!-- Trading Details -->
                 <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="h-3/12 grow"></Fieldset>
             </div>
         </div>
