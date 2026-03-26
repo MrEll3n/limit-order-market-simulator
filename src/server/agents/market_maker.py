@@ -149,6 +149,7 @@ class MarketMaker(AdminTrader, ABC):
 
 if __name__ == "__main__":
     config = json.load(open("../config/server_config.json"))
-    market_maker = MarketMaker("server", config, volume={"product1": 1000, "product2": 200})
+    market_maker = MarketMaker("server", config, volume={"product1": 1000, "product2": 200},
+                               initial_emission={"product1": 500, "product2": 400})
     market_maker.initialize_market()
     market_maker.generate_market_data()
