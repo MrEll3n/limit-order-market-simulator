@@ -69,5 +69,5 @@ export const useOrderBookStore = defineStore('orderBook', () => {
         timestamp.value = 0;
     }
 
-    return { bids, asks, timestamp, bestBid, bestAsk, midPrice, spread, imbalance, applySnapshot, fetchSnapshot, clear };
+    return { bids, asks, timestamp, bestBid, bestAsk, midPrice, spread, imbalance, loading, applySnapshot, fetchSnapshot, clear };
 });

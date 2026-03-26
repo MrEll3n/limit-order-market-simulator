@@ -6,11 +6,13 @@ export const useAccountStore = defineStore('account', () => {
     const user = ref<User | null>(null);
     const balance = ref<Balance | null>(null);
     const orders = ref<Record<string, Order>>({});
-    const loading = ref(false);
+    const loadingUser = ref(false);
+    const loadingBalance = ref(false);
+    const loadingOrders = ref(false);
     const error = ref<string | null>(null);
 
     async function fetchUser(accessToken: string): Promise<boolean> {
-        loading.value = true;
+        loadingUser.value = true;
         error.value = null;
         try {
             const res = await fetch('/api/auth/me', {
@@ -23,12 +25,12 @@ export const useAccountStore = defineStore('account', () => {
             error.value = e instanceof Error ? e.message : 'Failed to fetch user';
             return false;
         } finally {
-            loading.value = false;
+            loadingUser.value = false;
         }
     }
 
     async function fetchBalance(accessToken: string) {
-        loading.value = true;
+        loadingBalance.value = true;
         error.value = null;
         try {
             const res = await fetch('/api/account/balance', {
@@ -39,12 +41,12 @@ export const useAccountStore = defineStore('account', () => {
         } catch (e) {
             error.value = e instanceof Error ? e.message : 'Failed to fetch balance';
         } finally {
-            loading.value = false;
+            loadingBalance.value = false;
         }
     }
 
     async function fetchOrders(accessToken: string, product: string) {
-        loading.value = true;
+        loadingOrders.value = true;
         error.value = null;
         try {
             const res = await fetch(`/api/account/orders?product=${product}`, {
@@ -56,7 +58,7 @@ export const useAccountStore = defineStore('account', () => {
         } catch (e) {
             error.value = e instanceof Error ? e.message : 'Failed to fetch orders';
         } finally {
-            loading.value = false;
+            loadingOrders.value = false;
         }
     }
 
@@ -67,5 +69,5 @@ export const useAccountStore = defineStore('account', () => {
         error.value = null;
     }
 
-    return { user, balance, orders, loading, error, fetchUser, fetchBalance, fetchOrders, clear };
+    return { user, balance, orders, loadingUser, loadingBalance, loadingOrders, error, fetchUser, fetchBalance, fetchOrders, clear };
 });

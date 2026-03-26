@@ -4,11 +4,10 @@ import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
 import { useWebSocket } from '@vueuse/core';
 import Plotly from 'plotly.js-dist';
-import { SelectButton, Select } from 'primevue';
 import { useLocaleStore, useMarketStore, useAccountStore, useOrderBookStore } from '@/stores';
 import type { OrderBookSnapshot } from '@/types';
 import { storeToRefs } from 'pinia';
-import Message from 'primevue/message';
+import { usePageReady } from '@/composables/usePageReady';
 
 
 
@@ -26,7 +25,7 @@ const { products, selectedProduct } = storeToRefs(marketStore);
 const accountStore = useAccountStore();
 
 const orderBookStore = useOrderBookStore();
-const { midPrice, imbalance: imbalanceIndex } = storeToRefs(orderBookStore);
+const { midPrice, imbalance: imbalanceIndex, bids: obBids, asks: obAsks } = storeToRefs(orderBookStore);
 
 const localeStore = useLocaleStore();
 const { locale } = storeToRefs(localeStore);
@@ -70,11 +69,44 @@ const { data: wsData, open: wsOpen } = useWebSocket(wsUrl, {
     },
 });
 
+// Orders histogram
+const orderHistogramData = computed(() => {
+    const aggregate = (entries: typeof obBids.value) => {
+        const map = new Map<number, number>();
+        for (const e of entries) map.set(e.Price, (map.get(e.Price) ?? 0) + e.Quantity);
+        return map;
+    };
+    const bidMap = aggregate(obBids.value);
+    const askMap = aggregate(obAsks.value);
+    const prices = [...new Set([...bidMap.keys(), ...askMap.keys()])].sort((a, b) => a - b);
+    return {
+        labels: prices.map(String),
+        datasets: [
+            { label: 'Buy', data: prices.map(p => bidMap.get(p) ?? 0), backgroundColor: 'rgba(34,197,94,0.6)' },
+            { label: 'Sell', data: prices.map(p => askMap.get(p) ?? 0), backgroundColor: 'rgba(239,68,68,0.6)' },
+        ],
+    };
+});
+
+const orderHistogramOptions = {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { display: false } },
+    scales: {
+        x: { grid: { color: 'rgba(128,128,128,0.15)' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+    }
+};
+
 // Price chart
 const MAX_POINTS = 1000;
 const plotDiv = ref<HTMLDivElement | null>(null);
 let plotInitialized = false;
 const rawHistory = ref<OrderBookSnapshot[]>([]);
+const loadingChart = ref(true);
+const { pageReady } = usePageReady(loadingChart);
 
 type ChartZoom = 'MINUTE' | 'HOUR' | 'ALL';
 const chartZoomSelect = ref<ChartZoom>('HOUR');
@@ -136,11 +168,16 @@ const plotFromHistory = (snapshots: OrderBookSnapshot[]) => {
 watch(chartZoomSelect, () => plotFromHistory(rawHistory.value));
 watch(selectedProduct, async (product) => {
     if (!product) return;
-    orderBookStore.clear();
+    loadingChart.value = true;
     rawHistory.value = [];
     plotInitialized = false;
+    orderBookStore.clear();
+    const authData = getAuthData();
+    await Promise.all([
+        authData?.accessToken ? accountStore.fetchOrders(authData.accessToken, product) : Promise.resolve(),
+        orderBookStore.fetchSnapshot(product),
+    ]);
     await fetchChartHistory(product);
-    await orderBookStore.fetchSnapshot(product);
 });
 
 const initPlot = (labels: string[], bids: (number | null)[], asks: (number | null)[], mids: (number | null)[] = []) => {
@@ -230,6 +267,7 @@ watch(wsData, (raw) => {
 
 // Initial history from REST API
 const fetchChartHistory = async (product: string, historyLength: number = -1) => {
+    loadingChart.value = true;
     try {
         const res = await fetch(`/api/market/report?product=${product}&history_len=${historyLength}`);
         if (!res.ok) return;
@@ -239,10 +277,13 @@ const fetchChartHistory = async (product: string, historyLength: number = -1) =>
         plotFromHistory(rawHistory.value);
     } catch {
         // server not ready yet
+    } finally {
+        loadingChart.value = false;
     }
 };
 
 onMounted(async () => {
+    loadingChart.value = true;
     const authData = getAuthData();
     if (!authData?.accessToken) {
         clearAuthAndRedirect();
@@ -259,7 +300,13 @@ onMounted(async () => {
     }
 
     await marketStore.fetchProducts();
+    await Promise.all([
+        accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
+        orderBookStore.fetchSnapshot(selectedProduct.value),
+        accountStore.fetchBalance(authData.accessToken),
+    ]);
     wsOpen();
+    await fetchChartHistory(selectedProduct.value);
 });
 
 </script>
@@ -270,17 +317,22 @@ onMounted(async () => {
         <!-- Main View -->
         <div class="flex-1 flex flex-row overflow-hidden gap-3 mx-3">
             <div class="w-3/12 flex flex-col overflow-y-auto">
-                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="h-9/12 grow"> </Fieldset>
+                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset h-9/12 grow">
+                    <Skeleton v-if="!pageReady" style="height: 100%;" />
+                    <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" class="h-full w-full" />
+                </Fieldset>
                 <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="h-3/12 grow">
                     <div class="flex flex-col gap-1 text-sm">
-                        <div class="flex justify-between">
+                        <div class="flex justify-between items-center">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.midPrice') }}</span>
-                            <Message size="small" severity="warn">{{ midPrice !== null ? midPrice.toFixed(2) : '—' }}</Message>
+                            <Skeleton v-if="!pageReady" width="5rem" height="2rem" />
+                            <Message v-else size="small" severity="warn">{{ midPrice?.toFixed(2) ?? '—' }}</Message>
                         </div>
-                        <div class="flex justify-between">
+                        <div class="flex justify-between items-center">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.imbalance') }}</span>
-                            <Message size="small" :severity="imbalanceIndex === null ? 'secondary' : imbalanceIndex > 0 ? 'success' : 'error'">
-                                {{ imbalanceIndex !== null ? imbalanceIndex.toFixed(3) : '—' }}
+                            <Skeleton v-if="!pageReady" width="5rem" height="2rem" />
+                            <Message v-else size="small" :severity="imbalanceIndex !== null && imbalanceIndex > 0 ? 'success' : 'error'">
+                                {{ imbalanceIndex?.toFixed(3) ?? '—' }}
                             </Message>
                         </div>
                     </div>
@@ -289,10 +341,12 @@ onMounted(async () => {
 
             <div class="w-6/12 flex flex-col overflow-y-auto">
                 <Fieldset :legend="tDashboardPage('panels.priceChart')">
-                    <div ref="plotDiv" class="h-74 w-full" />
-                    <div class="flex flex-row justify-between">
+                    <Skeleton v-if="!pageReady" width="100%" height="18.5rem" />
+                    <div v-show="pageReady" ref="plotDiv" class="h-74 w-full" />
+                    <div class="flex flex-row justify-between mt-2">
                         <SelectButton v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
-                        <Select v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
+                        <Skeleton v-if="!pageReady" width="10rem" height="2rem" />
+                        <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
                     </div>
                 </Fieldset>
                 <Fieldset :legend="tDashboardPage('panels.orderBook')" class="grow"></Fieldset>
@@ -308,6 +362,12 @@ onMounted(async () => {
 </template>
 
 <style>
+.active-orders-fieldset .p-fieldset-content-container,
+.active-orders-fieldset .p-fieldset-content-wrapper,
+.active-orders-fieldset .p-fieldset-content {
+    height: 100%;
+}
+
 .js-plotly-plot .nottext text {
     font-family: var(--p-font-family) !important;
     font-size: var(--p-form-field-sm-font-size) !important;

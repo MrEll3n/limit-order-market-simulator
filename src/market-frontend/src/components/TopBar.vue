@@ -2,19 +2,26 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
-
+import { useAccountStore } from '@/stores';
+import { storeToRefs } from 'pinia';
 import Popover from 'primevue/popover';
+import { usePageReady } from '@/composables/usePageReady';
 
 const { t } = useI18n();
 const tDashboardPage = (key: string) => t(`dashboardPage.${key}`);
 
-const { clearAuthAndRedirect, getAuthData, refreshAccessToken, logout } = useAuth();
-const { email } = getAuthData()!;
+const { logout } = useAuth();
+
+const accountStore = useAccountStore();
+const { user, balance } = storeToRefs(accountStore);
+const { pageReady } = usePageReady();
 
 const op = ref<InstanceType<typeof Popover> | null>(null);
 const togglePopover = (event: MouseEvent) => {
     op.value?.toggle(event);
 };
+
+
 </script>
 
 <template>
@@ -24,7 +31,8 @@ const togglePopover = (event: MouseEvent) => {
         </template>
         <template #end>
             <div class="flex flex-row gap-4 justify-center items-center">
-                <span class="text-xl">Balance: 10,000</span>
+                <Skeleton v-if="!pageReady" width="9rem" class="mb-2"></Skeleton>
+                <span v-else class="text-xl">Balance: {{ balance?.budget }}</span>
                 <Avatar icon="pi pi-user" size="large" style="cursor: pointer" @click="togglePopover" />
                 <Popover ref="op">
                     <div class="flex flex-col w-56">
@@ -32,7 +40,8 @@ const togglePopover = (event: MouseEvent) => {
                         <div class="flex items-center gap-3 p-3">
                             <Avatar icon="pi pi-user" size="large" shape="circle" />
                             <div class="flex flex-col overflow-hidden">
-                                <span class="text-sm font-semibold truncate">{{ email }}</span>
+                                <Skeleton v-if="!pageReady" width="8rem" class="mb-2"></Skeleton>
+                                <span v-else class="text-sm font-semibold truncate">{{ user?.email }}</span>
                             </div>
                         </div>
 
@@ -71,6 +80,7 @@ const togglePopover = (event: MouseEvent) => {
                                 text
                                 fluid
                                 @click="logout"
+                                :disabled="!pageReady"
                             />
                         </div>
                     </div>
