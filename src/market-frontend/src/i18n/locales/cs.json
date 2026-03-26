@@ -165,6 +165,18 @@
         "metrics": {
             "midPrice": "Střední cena",
             "imbalance": "Nerovnováha"
+        },
+        "orderBook": {
+            "price": "Cena",
+            "quantity": "Mn.",
+            "spread": "Spread"
+        },
+        "orderHistory": {
+            "side": "Strana",
+            "price": "Cena",
+            "quantity": "Mn.",
+            "time": "Čas",
+            "empty": "Žádné aktivní objednávky"
         }
     }
 }

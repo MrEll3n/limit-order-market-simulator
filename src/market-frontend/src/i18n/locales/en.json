@@ -165,6 +165,18 @@
         "metrics": {
             "midPrice": "Mid Price",
             "imbalance": "Imbalance"
+        },
+        "orderBook": {
+            "price": "Price",
+            "quantity": "Qty",
+            "spread": "Spread"
+        },
+        "orderHistory": {
+            "side": "Side",
+            "price": "Price",
+            "quantity": "Qty",
+            "time": "Time",
+            "empty": "No active orders"
         }
     }
 }

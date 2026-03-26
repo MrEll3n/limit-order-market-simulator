@@ -8,6 +8,7 @@ import { useLocaleStore, useMarketStore, useAccountStore, useOrderBookStore } fr
 import type { OrderBookSnapshot } from '@/types';
 import { storeToRefs } from 'pinia';
 import { usePageReady } from '@/composables/usePageReady';
+import { orderHistogramOptions, obMidPricePlugin, getObHistogramOptions, plotLayout, plotConfig } from '@/config/chartConfig';
 
 
 
@@ -23,9 +24,14 @@ const marketStore = useMarketStore();
 const { products, selectedProduct } = storeToRefs(marketStore);
 
 const accountStore = useAccountStore();
+const { orders } = storeToRefs(accountStore);
 
 const orderBookStore = useOrderBookStore();
 const { midPrice, imbalance: imbalanceIndex, bids: obBids, asks: obAsks } = storeToRefs(orderBookStore);
+
+const userOrders = computed(() =>
+    Object.values(orders.value).sort((a, b) => b.timestamp - a.timestamp)
+);
 
 const localeStore = useLocaleStore();
 const { locale } = storeToRefs(localeStore);
@@ -88,17 +94,30 @@ const orderHistogramData = computed(() => {
     };
 });
 
-const orderHistogramOptions = {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: { legend: { display: false } },
-    scales: {
-        x: { grid: { color: 'rgba(128,128,128,0.15)' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
-        y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } },
-    }
-};
+
+// Order book chart
+const obHistogramData = computed(() => {
+    const bidMap = new Map<number, number>();
+    for (const e of obBids.value) bidMap.set(e.Price, (bidMap.get(e.Price) ?? 0) + e.Quantity);
+    const askMap = new Map<number, number>();
+    for (const e of obAsks.value) askMap.set(e.Price, (askMap.get(e.Price) ?? 0) + e.Quantity);
+    const prices = [...new Set([...bidMap.keys(), ...askMap.keys()])].sort((a, b) => a - b);
+    return {
+        labels: prices.map(p => p.toFixed(2)),
+        datasets: [
+            { label: tDashboardPage('chart.traces.bestBid'), data: prices.map(p => bidMap.get(p) ?? 0), backgroundColor: 'rgba(34,197,94,0.6)' },
+            { label: tDashboardPage('chart.traces.bestAsk'), data: prices.map(p => askMap.get(p) ?? 0), backgroundColor: 'rgba(239,68,68,0.6)' },
+        ],
+    };
+});
+
+const obVisibleLabels = computed(() => {
+    const bidPrices = [...new Set(obBids.value.map(e => e.Price))].sort((a, b) => b - a).slice(0, 2);
+    const askPrices = [...new Set(obAsks.value.map(e => e.Price))].sort((a, b) => a - b).slice(0, 2);
+    return [...bidPrices, ...askPrices].map(p => p.toFixed(2));
+});
+
+const obHistogramOptions = computed(() => getObHistogramOptions(midPrice.value, obVisibleLabels.value));
 
 // Price chart
 const MAX_POINTS = 1000;
@@ -116,29 +135,6 @@ const chartZoomSelectOpts = computed(() => [
     { name: tDashboardPage('chart.zoom.all'), value: 'ALL' },
 ]);
 
-const plotLayout: Partial<Plotly.Layout> = {
-    margin: { t: 10, r: 10, b: 40, l: 50 },
-    paper_bgcolor: 'transparent',
-    plot_bgcolor: 'transparent',
-    font: { color: '#9ca3af' },
-    xaxis: {
-        showgrid: false,
-        tickfont: { size: 11 },
-        nticks: 6,
-    },
-    yaxis: {
-        gridcolor: 'rgba(128,128,128,0.15)',
-        tickfont: { size: 11 },
-        zerolinecolor: 'rgba(128,128,128,0.2)',
-    },
-    legend: { orientation: 'h', y: 1.12, x: 0 },
-    hovermode: 'x unified',
-};
-
-const plotConfig: Partial<Plotly.Config> = {
-    responsive: true,
-    displayModeBar: false,
-};
 
 const plotFromHistory = (snapshots: OrderBookSnapshot[]) => {
     const now = Date.now();
@@ -348,16 +344,37 @@ onMounted(async () => {
                     <Skeleton v-if="!pageReady" width="100%" height="18.5rem" />
                     <div v-show="pageReady" ref="plotDiv" class="h-74 w-full" />
                     <div class="flex flex-row justify-between mt-2">
-                        <Skeleton v-if="!pageReady" width="13rem" height="2.5rem" />
-                        <SelectButton v-else v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
+                        <SelectButton :disabled="!pageReady" v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
                         <Skeleton v-if="!pageReady" width="10rem" height="2rem" />
                         <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
                     </div>
                 </Fieldset>
                 <!-- Order Book -->
-                <Fieldset :legend="tDashboardPage('panels.orderBook')" class="grow"></Fieldset>
+                <Fieldset :legend="tDashboardPage('panels.orderBook')" class="overflow-hidden h-3/12">
+                    <Skeleton v-if="!pageReady" height="9rem" width="100%" />
+                    <Chart v-else type="bar" :data="obHistogramData" :options="obHistogramOptions" :plugins="[obMidPricePlugin]" class="h-full w-full" />
+                </Fieldset>
                 <!-- Order History -->
-                <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="grow"></Fieldset>
+                <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="grow overflow-hidden">
+                    <Skeleton v-if="!pageReady" style="height: 100%;" />
+                    <div v-else class="flex flex-col h-full text-xs overflow-hidden">
+                        <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
+                            <span class="w-1/4">{{ tDashboardPage('orderHistory.side') }}</span>
+                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.price') }}</span>
+                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.quantity') }}</span>
+                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.time') }}</span>
+                        </div>
+                        <div class="overflow-y-auto flex-1">
+                            <div v-if="userOrders.length === 0" class="text-gray-400 text-center py-4">{{ tDashboardPage('orderHistory.empty') }}</div>
+                            <div v-for="order in userOrders" :key="order.id" class="flex justify-between px-2 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-700">
+                                <span class="w-1/4" :class="order.side === 'buy' ? 'text-green-400' : 'text-red-400'">{{ order.side }}</span>
+                                <span class="w-1/4 text-right">{{ order.price.toFixed(2) }}</span>
+                                <span class="w-1/4 text-right">{{ order.quantity }}</span>
+                                <span class="w-1/4 text-right text-gray-400">{{ new Date(order.timestamp / 1_000_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </Fieldset>
             </div>
 
             <div class="w-3/12 flex flex-col overflow-y-auto">
