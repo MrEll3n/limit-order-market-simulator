@@ -155,7 +155,12 @@
                 "hour": "Hodina",
                 "all": "Vše"
             },
-            "selectProduct": "Vybrat produkt"
+            "selectProduct": "Vybrat produkt",
+            "traces": {
+                "bestBid": "Nejlepší nákup",
+                "bestAsk": "Nejlepší prodej",
+                "midPrice": "Střední cena"
+            }
         },
         "metrics": {
             "midPrice": "Střední cena",

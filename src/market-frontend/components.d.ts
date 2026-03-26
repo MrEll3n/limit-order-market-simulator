@@ -19,6 +19,7 @@ declare module 'vue' {
     Fieldset: typeof import('primevue/fieldset')['default']
     LangSwitcher: typeof import('./src/components/LangSwitcher.vue')['default']
     MenuBar: typeof import('primevue/menubar')['default']
+    Message: typeof import('primevue/message')['default']
     Panel: typeof import('primevue/panel')['default']
     Popover: typeof import('primevue/popover')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

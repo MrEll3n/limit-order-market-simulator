@@ -155,7 +155,12 @@
                 "hour": "Hour",
                 "all": "All"
             },
-            "selectProduct": "Select product"
+            "selectProduct": "Select product",
+            "traces": {
+                "bestBid": "Best Bid",
+                "bestAsk": "Best Ask",
+                "midPrice": "Mid Price"
+            }
         },
         "metrics": {
             "midPrice": "Mid Price",

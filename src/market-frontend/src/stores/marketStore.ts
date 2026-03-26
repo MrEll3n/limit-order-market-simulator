@@ -25,11 +25,5 @@ export const useMarketStore = defineStore('market', () => {
         }
     }
 
-    function selectProduct(product: string) {
-        if (products.value.includes(product)) {
-            selectedProduct.value = product;
-        }
-    }
-
-    return { products, selectedProduct, loading, error, fetchProducts, selectProduct };
+    return { products, selectedProduct, loading, error, fetchProducts };
 });

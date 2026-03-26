@@ -4,57 +4,45 @@ import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
 import { useWebSocket } from '@vueuse/core';
 import Plotly from 'plotly.js-dist';
-import { type ChartZoom } from '@/types'
-import { SelectButton } from 'primevue';
-import { Select } from 'primevue'
-import { useMarketStore } from '@/stores';
+import { SelectButton, Select } from 'primevue';
+import { useLocaleStore, useMarketStore, useAccountStore, useOrderBookStore } from '@/stores';
+import type { OrderBookSnapshot } from '@/types';
 import { storeToRefs } from 'pinia';
+import Message from 'primevue/message';
 
+
+
+// Locale
 const { t } = useI18n();
 const tDashboardPage = (key: string) => t(`dashboardPage.${key}`);
 
-const { clearAuthAndRedirect, getAuthData, refreshAccessToken, logout } = useAuth();
+// Auth
+const { clearAuthAndRedirect, getAuthData, refreshAccessToken } = useAuth();
 
-// Market store
+// Stores
 const marketStore = useMarketStore();
 const { products, selectedProduct } = storeToRefs(marketStore);
 
-// Chart
-const chartZoomSelect = ref<ChartZoom>('ALL');
+const accountStore = useAccountStore();
 
-const chartZoomSelectOpts = computed(() => [
-    { name: tDashboardPage('chart.zoom.minute'), value: 'MINUTE' },
-    { name: tDashboardPage('chart.zoom.hour'), value: 'HOUR' },
-    { name: tDashboardPage('chart.zoom.all'), value: 'ALL' },
-]);
+const orderBookStore = useOrderBookStore();
+const { midPrice, imbalance: imbalanceIndex } = storeToRefs(orderBookStore);
 
-const chartProductOpts = [
-]
+const localeStore = useLocaleStore();
+const { locale } = storeToRefs(localeStore);
+watch(locale, () => plotFromHistory(rawHistory.value));
+
 
 
 // Types
-type OrderBookEntry = {
-    ID: string;
-    User: string;
-    Quantity: number;
-    Price: number;
-};
-
-type OrderBookSnapshot = {
-    Bids: OrderBookEntry[];
-    Asks: OrderBookEntry[];
-    Timestamp: number;
-};
-
 type WsEnvelope = {
     message: string;
 };
 
 type MarketReportResponse = {
     product: string;
-    history: string[]; // each item is a JSON-serialised OrderBookSnapshot
+    history: string[];
 };
-
 
 // FIX protocol parser
 // Messages are FIX 4.4 encoded: fields separated by \x01, format tag=value
@@ -82,45 +70,19 @@ const { data: wsData, open: wsOpen } = useWebSocket(wsUrl, {
     },
 });
 
-// ── Price chart ────────────────────────────────────────────────────
+// Price chart
 const MAX_POINTS = 1000;
 const plotDiv = ref<HTMLDivElement | null>(null);
 let plotInitialized = false;
 const rawHistory = ref<OrderBookSnapshot[]>([]);
 
-// Mid price & imbalance
-const midPrice = ref<number | null>(null);
-const imbalanceIndex = ref<number | null>(null);
-
-const calculateImbalance = (bids: OrderBookEntry[], asks: OrderBookEntry[], alpha = 0.5, levels = 3): number | null => {
-    if (!bids.length || !asks.length) return null;
-
-    // Agregace množství podle ceny (stejně jako groupby v Pythonu)
-    const aggregate = (entries: OrderBookEntry[]) => {
-        const map = new Map<number, number>();
-        for (const e of entries) map.set(e.Price, (map.get(e.Price) ?? 0) + e.Quantity);
-        return [...map.values()];
-    };
-
-    const bidQtys = aggregate(bids).slice(0, levels);
-    const askQtys = aggregate(asks).slice(0, levels);
-
-    let vBid = 0, vAsk = 0;
-    for (let i = 0; i < Math.max(bidQtys.length, askQtys.length); i++) {
-        const w = Math.exp(-alpha * i);
-        if (i < bidQtys.length) vBid += bidQtys[i] * w;
-        if (i < askQtys.length) vAsk += askQtys[i] * w;
-    }
-    if (vBid + vAsk === 0) return null;
-    return (vBid - vAsk) / (vBid + vAsk);
-};
-
-const updatePriceMetrics = (snapshot: OrderBookSnapshot) => {
-    const bestBid = snapshot.Bids?.[0]?.Price ?? null;
-    const bestAsk = snapshot.Asks?.[0]?.Price ?? null;
-    midPrice.value = bestBid !== null && bestAsk !== null ? (bestBid + bestAsk) / 2 : null;
-    imbalanceIndex.value = calculateImbalance(snapshot.Bids ?? [], snapshot.Asks ?? []);
-};
+type ChartZoom = 'MINUTE' | 'HOUR' | 'ALL';
+const chartZoomSelect = ref<ChartZoom>('HOUR');
+const chartZoomSelectOpts = computed(() => [
+    { name: tDashboardPage('chart.zoom.minute'), value: 'MINUTE' },
+    { name: tDashboardPage('chart.zoom.hour'), value: 'HOUR' },
+    { name: tDashboardPage('chart.zoom.all'), value: 'ALL' },
+]);
 
 const plotLayout: Partial<Plotly.Layout> = {
     margin: { t: 10, r: 10, b: 40, l: 50 },
@@ -174,49 +136,42 @@ const plotFromHistory = (snapshots: OrderBookSnapshot[]) => {
 watch(chartZoomSelect, () => plotFromHistory(rawHistory.value));
 watch(selectedProduct, async (product) => {
     if (!product) return;
-    midPrice.value = null;
-    imbalanceIndex.value = null;
+    orderBookStore.clear();
     rawHistory.value = [];
     plotInitialized = false;
     await fetchChartHistory(product);
-    try {
-        const res = await fetch(`/api/market/orderbook?product=${product}`);
-        if (res.ok) {
-            const data = await res.json() as { orderBook: OrderBookSnapshot };
-            updatePriceMetrics(data.orderBook);
-        }
-    } catch { /* ignore */ }
+    await orderBookStore.fetchSnapshot(product);
 });
 
 const initPlot = (labels: string[], bids: (number | null)[], asks: (number | null)[], mids: (number | null)[] = []) => {
     if (!plotDiv.value) return;
     const traces: Plotly.Data[] = [
         {
-            name: 'Best Bid',
+            name: tDashboardPage('chart.traces.bestBid'),
             x: labels,
             y: bids,
-            type: 'scatter',
+            type: 'scattergl',
             mode: 'lines',
             line: { color: '#22c55e', width: 2, shape: 'spline', smoothing: 0.3 },
-            connectgaps: false,
+            connectgaps: true,
         },
         {
-            name: 'Best Ask',
+            name: tDashboardPage('chart.traces.bestAsk'),
             x: labels,
             y: asks,
-            type: 'scatter',
+            type: 'scattergl',
             mode: 'lines',
             line: { color: '#ef4444', width: 2, shape: 'spline', smoothing: 0.3 },
-            connectgaps: false,
+            connectgaps: true,
         },
         {
-            name: 'Mid Price',
+            name: tDashboardPage('chart.traces.midPrice'),
             x: labels,
             y: mids,
-            type: 'scatter',
+            type: 'scattergl',
             mode: 'lines',
             line: { color: '#facc15', width: 1.5, dash: 'dot', shape: 'spline', smoothing: 0.3 },
-            connectgaps: false,
+            connectgaps: true,
         },
     ];
     Plotly.newPlot(plotDiv.value, traces, plotLayout, plotConfig);
@@ -263,7 +218,7 @@ watch(wsData, (raw) => {
             : 0;
         if (ts < cutoff) return;
 
-        updatePriceMetrics(orderBook);
+        orderBookStore.applySnapshot(orderBook);
         const bestBid: number | null = orderBook.Bids?.[0]?.Price ?? null;
         const bestAsk: number | null = orderBook.Asks?.[0]?.Price ?? null;
         const time = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -280,26 +235,8 @@ const fetchChartHistory = async (product: string, historyLength: number = -1) =>
         if (!res.ok) return;
         const { history } = (await res.json()) as MarketReportResponse;
 
-        const labels: string[] = [];
-        const bids: (number | null)[] = [];
-        const asks: (number | null)[] = [];
-        const mids: (number | null)[] = [];
-
-        const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
-
-        history.forEach((snapshotStr) => {
-            const snapshot = JSON.parse(snapshotStr) as OrderBookSnapshot;
-            const ts = snapshot.Timestamp > 0 ? snapshot.Timestamp / 1_000_000 : Date.now();
-            const b = snapshot.Bids?.[0]?.Price ?? null;
-            const a = snapshot.Asks?.[0]?.Price ?? null;
-            labels.push(new Date(ts).toLocaleTimeString([], timeOpts));
-            bids.push(b);
-            asks.push(a);
-            mids.push(b !== null && a !== null ? (b + a) / 2 : null);
-        });
-
         rawHistory.value = history.map(s => JSON.parse(s) as OrderBookSnapshot);
-        initPlot(labels, bids, asks, mids);
+        plotFromHistory(rawHistory.value);
     } catch {
         // server not ready yet
     }
@@ -312,27 +249,19 @@ onMounted(async () => {
         return;
     }
 
-    try {
-        const res = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${authData.accessToken}` },
-        });
-
-        if (!res.ok) {
-            const refreshed = await refreshAccessToken();
-            if (!refreshed) {
-                clearAuthAndRedirect();
-                return;
-            }
+    const ok = await accountStore.fetchUser(authData.accessToken);
+    if (!ok) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+            clearAuthAndRedirect();
+            return;
         }
-    } catch {
-        clearAuthAndRedirect();
-        return;
     }
 
     await marketStore.fetchProducts();
-    await fetchChartHistory(selectedProduct.value);
     wsOpen();
 });
+
 </script>
 
 <template>
@@ -346,27 +275,24 @@ onMounted(async () => {
                     <div class="flex flex-col gap-1 text-sm">
                         <div class="flex justify-between">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.midPrice') }}</span>
-                            <span class="text-yellow-400 font-mono">{{ midPrice !== null ? midPrice.toFixed(2) : '—' }}</span>
+                            <Message size="small" severity="warn">{{ midPrice !== null ? midPrice.toFixed(2) : '—' }}</Message>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.imbalance') }}</span>
-                            <span
-                                class="font-mono"
-                                :class="imbalanceIndex === null ? 'text-gray-400' : imbalanceIndex > 0 ? 'text-green-400' : 'text-red-400'"
-                            >
+                            <Message size="small" :severity="imbalanceIndex === null ? 'secondary' : imbalanceIndex > 0 ? 'success' : 'error'">
                                 {{ imbalanceIndex !== null ? imbalanceIndex.toFixed(3) : '—' }}
-                            </span>
+                            </Message>
                         </div>
                     </div>
                 </Fieldset>
             </div>
 
             <div class="w-6/12 flex flex-col overflow-y-auto">
-                <Fieldset :legend="tDashboardPage('panels.priceChart')" class="">
+                <Fieldset :legend="tDashboardPage('panels.priceChart')">
                     <div ref="plotDiv" class="h-74 w-full" />
                     <div class="flex flex-row justify-between">
                         <SelectButton v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
-                        <Select v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-56" />
+                        <Select v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
                     </div>
                 </Fieldset>
                 <Fieldset :legend="tDashboardPage('panels.orderBook')" class="grow"></Fieldset>
@@ -380,3 +306,11 @@ onMounted(async () => {
         </div>
     </div>
 </template>
+
+<style>
+.js-plotly-plot .nottext text {
+    font-family: var(--p-font-family) !important;
+    font-size: var(--p-form-field-sm-font-size) !important;
+    fill: var(--p-text-muted-color) !important;
+}
+</style>
