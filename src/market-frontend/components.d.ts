@@ -17,6 +17,7 @@ declare module 'vue' {
     ChartZoomSelect: typeof import('./src/components/ChartZoomSelect.vue')['default']
     Divider: typeof import('primevue/divider')['default']
     Fieldset: typeof import('primevue/fieldset')['default']
+    InputNumber: typeof import('primevue/inputnumber')['default']
     LangSwitcher: typeof import('./src/components/LangSwitcher.vue')['default']
     MenuBar: typeof import('primevue/menubar')['default']
     Message: typeof import('primevue/message')['default']
@@ -28,6 +29,7 @@ declare module 'vue' {
     SelectButton: typeof import('primevue/selectbutton')['default']
     Skeleton: typeof import('primevue/skeleton')['default']
     ThemeSwitcher: typeof import('./src/components/ThemeSwitcher.vue')['default']
+    Toast: typeof import('primevue/toast')['default']
     TopBar: typeof import('./src/components/TopBar.vue')['default']
   }
 }

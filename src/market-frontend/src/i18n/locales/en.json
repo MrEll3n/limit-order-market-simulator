@@ -162,9 +162,28 @@
                 "midPrice": "Mid Price"
             }
         },
+        "tradingPanel": {
+            "buy": "Buy",
+            "sell": "Sell",
+            "product": "Product",
+            "price": "Price",
+            "quantity": "Quantity",
+            "submit": "Place Order",
+            "toast": {
+                "orderPlaced": "Order placed",
+                "orderFailed": "Order failed",
+                "cancelFailed": "Cancel failed"
+            }
+        },
+        "activeOrders": {
+            "noOrders": "No orders yet"
+        },
         "metrics": {
             "midPrice": "Mid Price",
-            "imbalance": "Imbalance"
+            "imbalance": "Imbalance",
+            "budget": "Budget",
+            "shares": "shares",
+            "noShares": "No shares yet"
         },
         "orderBook": {
             "price": "Price",
@@ -176,7 +195,7 @@
             "price": "Price",
             "quantity": "Qty",
             "time": "Time",
-            "empty": "No active orders"
+            "empty": "No orders yet"
         }
     }
 }

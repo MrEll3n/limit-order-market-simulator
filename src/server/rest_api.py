@@ -694,7 +694,7 @@ class OrderDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         if order.user != user_id:
             return _json_error(self, 403, "Order belongs to another user")
 
-        result = _product_manager.get_order_book(product, time.time_ns())\
+        result = _product_manager.get_order_book(product, save_history=True, timestamp=time.time_ns())\
             .modify_order_qty(order_id, quantity)
         if not result:
             return _json_error(self, 422, "Quantity modification failed (can only decrease)")
@@ -717,7 +717,7 @@ class OrderDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         if order.user != user_id:
             return _json_error(self, 403, "Order belongs to another user")
 
-        _product_manager.get_order_book(product, time.time_ns()).delete_order(order_id)
+        _product_manager.get_order_book(product, save_history=True, timestamp=time.time_ns()).delete_order(order_id)
 
         # Broadcast updated order book
         if _WebSocketHandler:

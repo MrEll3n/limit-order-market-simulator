@@ -27,12 +27,12 @@ const togglePopover = (event: MouseEvent) => {
 <template>
     <MenuBar>
         <template #start>
-            <span class="select-none text-2xl">Honicoin Crypto</span>
+            <span class="select-none text-2xl font-extrabold">Honicoin Crypto</span>
         </template>
         <template #end>
             <div class="flex flex-row gap-4 justify-center items-center">
                 <Skeleton v-if="!pageReady" width="9rem" class="mb-2"></Skeleton>
-                <span v-else class="text-xl">Balance: {{ balance?.budget }}</span>
+                <span v-else class="text-xl">Balance: {{  balance?.budget.toFixed(2) }}</span>
                 <Avatar icon="pi pi-user" size="large" style="cursor: pointer" @click="togglePopover" />
                 <Popover ref="op">
                     <div class="flex flex-col w-56">

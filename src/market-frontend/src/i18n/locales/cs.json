@@ -162,9 +162,28 @@
                 "midPrice": "Střední cena"
             }
         },
+        "tradingPanel": {
+            "buy": "Koupit",
+            "sell": "Prodat",
+            "product": "Produkt",
+            "price": "Cena",
+            "quantity": "Množství",
+            "submit": "Zadat příkaz",
+            "toast": {
+                "orderPlaced": "Příkaz zadán",
+                "orderFailed": "Chyba příkazu",
+                "cancelFailed": "Zrušení selhalo"
+            }
+        },
+        "activeOrders": {
+            "noOrders": "Žádné aktivní příkazy"
+        },
         "metrics": {
             "midPrice": "Střední cena",
-            "imbalance": "Nerovnováha"
+            "imbalance": "Nerovnováha",
+            "budget": "Rozpočet",
+            "shares": "ks",
+            "noShares": "Žádné podíly"
         },
         "orderBook": {
             "price": "Cena",

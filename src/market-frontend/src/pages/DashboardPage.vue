@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
+import useToastHandler from '@/composables/useToastHandler';
 import { useWebSocket } from '@vueuse/core';
 import Plotly from 'plotly.js-dist';
 import { useLocaleStore, useMarketStore, useAccountStore, useOrderBookStore } from '@/stores';
@@ -24,7 +25,8 @@ const marketStore = useMarketStore();
 const { products, selectedProduct } = storeToRefs(marketStore);
 
 const accountStore = useAccountStore();
-const { orders } = storeToRefs(accountStore);
+const { orders, balance } = storeToRefs(accountStore);
+const { showSuccess, showError } = useToastHandler();
 
 const orderBookStore = useOrderBookStore();
 const { midPrice, imbalance: imbalanceIndex, bids: obBids, asks: obAsks } = storeToRefs(orderBookStore);
@@ -279,6 +281,82 @@ const fetchChartHistory = async (product: string, historyLength: number = -1) =>
     }
 };
 
+// Trading Panel
+const orderSide = ref<'buy' | 'sell'>('buy');
+const orderPrice = ref<number | null>(null);
+const orderQuantity = ref<number | null>(null);
+const submitting = ref(false);
+
+const orderSideOpts = computed(() => [
+    { name: tDashboardPage('tradingPanel.buy'), value: 'buy' },
+    { name: tDashboardPage('tradingPanel.sell'), value: 'sell' },
+]);
+
+watch(midPrice, (val) => {
+    if (val !== null && orderPrice.value === null) orderPrice.value = val;
+}, { immediate: true });
+
+const cancellingId = ref<string | null>(null);
+
+const cancelOrder = async (orderId: string) => {
+    cancellingId.value = orderId;
+    try {
+        const authData = getAuthData();
+        if (!authData?.accessToken) { clearAuthAndRedirect(); return; }
+        const res = await fetch(`/api/orders/${orderId}?product=${selectedProduct.value}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${authData.accessToken}` },
+        });
+        if (res.ok) {
+            await Promise.all([
+                accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
+                accountStore.fetchBalance(authData.accessToken),
+            ]);
+        } else {
+            const data = await res.json().catch(() => ({}));
+            showError({ label: tDashboardPage('tradingPanel.toast.cancelFailed'), detail: data.error ?? res.statusText });
+        }
+    } catch {
+        showError({ label: tDashboardPage('tradingPanel.toast.cancelFailed'), detail: '—' });
+    } finally {
+        cancellingId.value = null;
+    }
+};
+
+const placeOrder = async () => {
+    if (!orderPrice.value || !orderQuantity.value) return;
+    submitting.value = true;
+    try {
+        const authData = getAuthData();
+        if (!authData?.accessToken) { clearAuthAndRedirect(); return; }
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authData.accessToken}` },
+            body: JSON.stringify({
+                product: selectedProduct.value,
+                side: orderSide.value,
+                quantity: orderQuantity.value,
+                price: orderPrice.value,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showError({ label: tDashboardPage('tradingPanel.toast.orderFailed'), detail: data.error ?? res.statusText });
+        } else {
+            showSuccess({ label: tDashboardPage('tradingPanel.toast.orderPlaced'), detail: `#${data.orderId} — ${data.status}` });
+            orderQuantity.value = null;
+            await Promise.all([
+                accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
+                accountStore.fetchBalance(authData.accessToken),
+            ]);
+        }
+    } catch {
+        showError({ label: tDashboardPage('tradingPanel.toast.orderFailed'), detail: '—' });
+    } finally {
+        submitting.value = false;
+    }
+};
+
 onMounted(async () => {
     loadingChart.value = true;
     const authData = getAuthData();
@@ -350,10 +428,10 @@ onMounted(async () => {
                     </div>
                 </Fieldset>
                 <!-- Order Book -->
-                <Fieldset :legend="tDashboardPage('panels.orderBook')" class="overflow-hidden h-3/12">
+                <!-- <Fieldset :legend="tDashboardPage('panels.orderBook')" class="overflow-hidden h-3/12">
                     <Skeleton v-if="!pageReady" height="9rem" width="100%" />
                     <Chart v-else type="bar" :data="obHistogramData" :options="obHistogramOptions" :plugins="[obMidPricePlugin]" class="h-full w-full" />
-                </Fieldset>
+                </Fieldset> -->
                 <!-- Order History -->
                 <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="grow overflow-hidden">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
@@ -377,12 +455,118 @@ onMounted(async () => {
                 </Fieldset>
             </div>
 
-            <div class="w-3/12 flex flex-col overflow-y-auto">
-                <!-- Trading Panel -->
-                <Fieldset :legend="tDashboardPage('panels.tradingPanel')" class="h-9/12 grow"> </Fieldset>
+            <div class="w-3/12 flex flex-col overflow-hidden gap-3">
                 <!-- Trading Details -->
-                <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="h-3/12 grow"></Fieldset>
+                <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="shrink-0">
+                    <div class="flex flex-col gap-1 text-sm">
+                        <template v-if="!pageReady">
+                            <div v-for="i in products.length || 1" :key="i" class="flex justify-between items-center">
+                                <Skeleton width="4rem" height="1rem" />
+                                <Skeleton width="3rem" height="2rem" />
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div
+                                v-for="product in products.filter(p => (balance?.products?.[p]?.postSellVolume ?? 0) > 0)"
+                                :key="product"
+                                class="flex justify-between items-center"
+                            >
+                                <span class="text-gray-400">{{ product }}</span>
+                                <Message size="small" severity="secondary">
+                                    {{ balance?.products?.[product]?.postSellVolume }} {{ tDashboardPage('metrics.shares') }}
+                                </Message>
+                            </div>
+                            <div v-if="!products.some(p => (balance?.products?.[p]?.postSellVolume ?? 0) > 0)" class="text-gray-400 text-xs text-center py-1">
+                                {{ tDashboardPage('metrics.noShares') }}
+                            </div>
+                        </template>
+                    </div>
+                </Fieldset>
+                <!-- Trading Panel -->
+                <Fieldset :legend="tDashboardPage('panels.tradingPanel')" class="shrink-0">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-gray-400">{{ tDashboardPage('tradingPanel.product') }}</label>
+                            <Skeleton v-if="!pageReady" height="2.25rem" width="100%" />
+                            <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" fluid />
+                        </div>
+                        <SelectButton
+                            v-model="orderSide"
+                            :options="orderSideOpts"
+                            option-label="name"
+                            option-value="value"
+                            :allow-empty="false"
+                            :disabled="!pageReady || submitting"
+                            class="w-full"
+                        />
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-gray-400">{{ tDashboardPage('tradingPanel.price') }}</label>
+                            <InputNumber
+                                v-model="orderPrice"
+                                :min="0.01"
+                                :max-fraction-digits="2"
+                                :min-fraction-digits="2"
+                                :disabled="!pageReady || submitting"
+                                fluid
+                            />
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-gray-400">{{ tDashboardPage('tradingPanel.quantity') }}</label>
+                            <InputNumber
+                                v-model="orderQuantity"
+                                :min="1"
+                                :max-fraction-digits="0"
+                                :disabled="!pageReady || submitting"
+                                fluid
+                            />
+                        </div>
+                        <Button
+                            :label="tDashboardPage('tradingPanel.submit')"
+                            :severity="orderSide === 'buy' ? 'success' : 'danger'"
+                            :loading="submitting"
+                            :disabled="!pageReady || !orderPrice || !orderQuantity"
+                            @click="placeOrder"
+                            fluid
+                        />
+                    </div>
+                </Fieldset>
+                <!-- Active Orders -->
+                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="grow overflow-hidden active-orders-right-fieldset">
+                    <Skeleton v-if="!pageReady" style="height: 100%;" />
+                    <div v-else class="flex flex-col h-full text-xs overflow-hidden">
+                        <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
+                            <span class="w-1/4">{{ tDashboardPage('orderHistory.side') }}</span>
+                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.price') }}</span>
+                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.quantity') }}</span>
+                            <span class="w-1/12"></span>
+                        </div>
+                        <div class="overflow-y-auto flex-1">
+                            <div v-if="userOrders.length === 0" class="text-gray-400 text-center py-4">{{ tDashboardPage('activeOrders.noOrders') }}</div>
+                            <div
+                                v-for="order in userOrders"
+                                :key="order.id"
+                                class="flex items-center justify-between px-2 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-700"
+                            >
+                                <span class="w-1/4" :class="order.side === 'buy' ? 'text-green-400' : 'text-red-400'">{{ order.side }}</span>
+                                <span class="w-1/4 text-right">{{ order.price.toFixed(2) }}</span>
+                                <span class="w-1/4 text-right">{{ order.quantity }}</span>
+                                <Button
+                                    icon="pi pi-times"
+                                    severity="danger"
+                                    text
+                                    rounded
+                                    size="small"
+                                    :loading="cancellingId === order.id"
+                                    :disabled="cancellingId !== null"
+                                    class="w-1/12 p-0!"
+                                    @click="cancelOrder(order.id)"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </Fieldset>
             </div>
+            <Toast />
         </div>
     </div>
 </template>
@@ -391,6 +575,12 @@ onMounted(async () => {
 .active-orders-fieldset .p-fieldset-content-container,
 .active-orders-fieldset .p-fieldset-content-wrapper,
 .active-orders-fieldset .p-fieldset-content {
+    height: 100%;
+}
+
+.active-orders-right-fieldset .p-fieldset-content-container,
+.active-orders-right-fieldset .p-fieldset-content-wrapper,
+.active-orders-right-fieldset .p-fieldset-content {
     height: 100%;
 }
 
