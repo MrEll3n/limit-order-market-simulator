@@ -143,8 +143,9 @@
         },
         "panels": {
             "activeOrders": "Aktivní objednávky",
-            "tradingDetails": "Detaily obchodování",
-            "priceChart": "Cenový graf",
+            "tradingDetails": "Detaily obchodu",
+            "ownedStocks": "Vlastněné akcie",
+            "priceChart": "Vývoj ceny",
             "orderBook": "Kniha objednávek",
             "orderHistory": "Historie objednávek",
             "tradingPanel": "Obchodní panel"
@@ -183,7 +184,9 @@
             "imbalance": "Nerovnováha",
             "budget": "Rozpočet",
             "shares": "ks",
-            "noShares": "Žádné podíly"
+            "noShares": "Žádné podíly",
+            "portfolio": "Portfolio",
+            "balance": "Zůstatek"
         },
         "orderBook": {
             "price": "Cena",
@@ -194,8 +197,14 @@
             "side": "Strana",
             "price": "Cena",
             "quantity": "Mn.",
+            "status": "Stav",
             "time": "Čas",
-            "empty": "Žádné aktivní objednávky"
+            "empty": "Žádné objednávky",
+            "statuses": {
+                "open": "Otevřená",
+                "filled": "Splněna",
+                "cancelled": "Zrušena"
+            }
         }
     }
 }

@@ -32,7 +32,16 @@ const togglePopover = (event: MouseEvent) => {
         <template #end>
             <div class="flex flex-row gap-4 justify-center items-center">
                 <Skeleton v-if="!pageReady" width="9rem" class="mb-2"></Skeleton>
-                <span v-else class="text-xl">Balance: {{  balance?.budget.toFixed(2) }}</span>
+                <div v-else class="flex flex-row gap-6">
+                    <div class="flex flex-col items-end leading-tight">
+                        <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.balance') }}</span>
+                        <span class="text-base font-semibold">{{ balance?.postBuyBudget.toFixed(2) }}</span>
+                    </div>
+                    <div class="flex flex-col items-end leading-tight">
+                        <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.portfolio') }}</span>
+                        <span class="text-base font-semibold">{{ balance?.budget.toFixed(2) }}</span>
+                    </div>
+                </div>
                 <Avatar icon="pi pi-user" size="large" style="cursor: pointer" @click="togglePopover" />
                 <Popover ref="op">
                     <div class="flex flex-col w-56">

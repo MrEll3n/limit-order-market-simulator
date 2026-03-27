@@ -36,6 +36,7 @@ Routes (all prefixed with /api):
     GET    /api/account/balance?product=…  – budget + balances for one product
     GET    /api/account/balance            – budget + balances for all products
     GET    /api/account/orders?product=…   – user's active orders
+    GET    /api/account/history?product=…  – user's order history
 """
 
 import asyncio
@@ -611,6 +612,18 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 
         status = _product_manager.get_matching_engine(product, timestamp).match_order(order)
 
+        if status is None:
+            # Order was immediately filled — never entered the book so add_order was never called
+            ob = _product_manager.get_order_book(product, False)
+            ob.order_history.setdefault(user_id, []).append({
+                'id': order.id,
+                'timestamp': order.timestamp,
+                'side': order.side,
+                'price': order.price,
+                'quantity': order.quantity,
+                'status': 'filled',
+            })
+
         if status is not False:
             # Apply trading fee
             fixed_fee = 0.01
@@ -921,6 +934,24 @@ class AdminRolesHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         _json_ok(self, {"roles": [{"name": r[0], "description": r[1]} for r in rows]})
 
 
+class AccountOrderHistoryHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """GET /api/account/history?product=…  — user's full order history for one product"""
+
+    def get(self):
+        email, user_id, role = _require_auth(self)
+        if not email:
+            return
+
+        product = self.get_argument("product", None)
+        if not product or product not in _products:
+            return _json_error(self, 400, f"Unknown product. Valid: {_products}")
+
+        ob = _product_manager.get_order_book(product, False)
+        history = list(ob.order_history.get(user_id, []))
+        history.sort(key=lambda x: x['timestamp'], reverse=True)
+        _json_ok(self, {"userId": user_id, "product": product, "history": history})
+
+
 # ---------------------------------------------------------------------------
 # Route table  (imported by server.py)
 # ---------------------------------------------------------------------------
@@ -942,6 +973,7 @@ REST_ROUTES = [
     # Account
     (r"/api/account/balance",  AccountBalanceHandler),
     (r"/api/account/orders",   AccountOrdersHandler),
+    (r"/api/account/history",  AccountOrderHistoryHandler),
     # Admin
     (r"/api/admin/users",            AdminUsersHandler),
     (r"/api/admin/users/([^/]+)",    AdminUserDetailHandler),

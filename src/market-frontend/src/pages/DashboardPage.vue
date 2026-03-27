@@ -25,8 +25,9 @@ const marketStore = useMarketStore();
 const { products, selectedProduct } = storeToRefs(marketStore);
 
 const accountStore = useAccountStore();
-const { orders, balance } = storeToRefs(accountStore);
+const { orders, balance, orderHistory } = storeToRefs(accountStore);
 const { showSuccess, showError } = useToastHandler();
+const { fetchOrderHistory } = accountStore;
 
 const orderBookStore = useOrderBookStore();
 const { midPrice, imbalance: imbalanceIndex, bids: obBids, asks: obAsks } = storeToRefs(orderBookStore);
@@ -173,6 +174,7 @@ watch(selectedProduct, async (product) => {
     const authData = getAuthData();
     await Promise.all([
         authData?.accessToken ? accountStore.fetchOrders(authData.accessToken, product) : Promise.resolve(),
+        authData?.accessToken ? fetchOrderHistory(authData.accessToken, product) : Promise.resolve(),
         orderBookStore.fetchSnapshot(product),
     ]);
     await fetchChartHistory(product);
@@ -311,6 +313,7 @@ const cancelOrder = async (orderId: string) => {
             await Promise.all([
                 accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
                 accountStore.fetchBalance(authData.accessToken),
+                fetchOrderHistory(authData.accessToken, selectedProduct.value),
             ]);
         } else {
             const data = await res.json().catch(() => ({}));
@@ -348,6 +351,7 @@ const placeOrder = async () => {
             await Promise.all([
                 accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
                 accountStore.fetchBalance(authData.accessToken),
+                fetchOrderHistory(authData.accessToken, selectedProduct.value),
             ]);
         }
     } catch {
@@ -379,6 +383,7 @@ onMounted(async () => {
         accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
         orderBookStore.fetchSnapshot(selectedProduct.value),
         accountStore.fetchBalance(authData.accessToken),
+        fetchOrderHistory(authData.accessToken, selectedProduct.value),
     ]);
     wsOpen();
     await fetchChartHistory(selectedProduct.value);
@@ -437,18 +442,20 @@ onMounted(async () => {
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <div v-else class="flex flex-col h-full text-xs overflow-hidden">
                         <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
-                            <span class="w-1/4">{{ tDashboardPage('orderHistory.side') }}</span>
-                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.price') }}</span>
-                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.quantity') }}</span>
-                            <span class="w-1/4 text-right">{{ tDashboardPage('orderHistory.time') }}</span>
+                            <span class="w-1/5">{{ tDashboardPage('orderHistory.side') }}</span>
+                            <span class="w-1/5 text-right">{{ tDashboardPage('orderHistory.price') }}</span>
+                            <span class="w-1/5 text-right">{{ tDashboardPage('orderHistory.quantity') }}</span>
+                            <span class="w-1/5 text-right">{{ tDashboardPage('orderHistory.status') }}</span>
+                            <span class="w-1/5 text-right">{{ tDashboardPage('orderHistory.time') }}</span>
                         </div>
                         <div class="overflow-y-auto flex-1">
-                            <div v-if="userOrders.length === 0" class="text-gray-400 text-center py-4">{{ tDashboardPage('orderHistory.empty') }}</div>
-                            <div v-for="order in userOrders" :key="order.id" class="flex justify-between px-2 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-700">
-                                <span class="w-1/4" :class="order.side === 'buy' ? 'text-green-400' : 'text-red-400'">{{ order.side }}</span>
-                                <span class="w-1/4 text-right">{{ order.price.toFixed(2) }}</span>
-                                <span class="w-1/4 text-right">{{ order.quantity }}</span>
-                                <span class="w-1/4 text-right text-gray-400">{{ new Date(order.timestamp / 1_000_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span>
+                            <div v-if="orderHistory.length === 0" class="text-gray-400 text-center py-4">{{ tDashboardPage('orderHistory.empty') }}</div>
+                            <div v-for="entry in orderHistory" :key="entry.id" class="flex justify-between px-2 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-700">
+                                <span class="w-1/5" :class="entry.side === 'buy' ? 'text-green-400' : 'text-red-400'">{{ entry.side }}</span>
+                                <span class="w-1/5 text-right">{{ entry.price.toFixed(2) }}</span>
+                                <span class="w-1/5 text-right">{{ entry.quantity }}</span>
+                                <span class="w-1/5 text-right" :class="entry.status === 'filled' ? 'text-green-400' : entry.status === 'cancelled' ? 'text-red-400' : 'text-gray-400'">{{ tDashboardPage(`orderHistory.statuses.${entry.status}`) }}</span>
+                                <span class="w-1/5 text-right text-gray-400">{{ new Date(entry.timestamp / 1_000_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span>
                             </div>
                         </div>
                     </div>
@@ -456,8 +463,8 @@ onMounted(async () => {
             </div>
 
             <div class="w-3/12 flex flex-col overflow-hidden gap-3">
-                <!-- Trading Details -->
-                <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="shrink-0">
+                <!-- Owned -->
+                <Fieldset :legend="tDashboardPage('panels.ownedStocks')" class="shrink-0">
                     <div class="flex flex-col gap-1 text-sm">
                         <template v-if="!pageReady">
                             <div v-for="i in products.length || 1" :key="i" class="flex justify-between items-center">

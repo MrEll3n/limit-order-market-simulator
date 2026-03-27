@@ -16,4 +16,11 @@ export type ProductBalance = {
     postSellVolume: number;
 };
 
-
+export type OrderHistoryEntry = {
+    id: string;
+    timestamp: number;
+    side: 'buy' | 'sell';
+    price: number;
+    quantity: number;
+    status: 'open' | 'filled' | 'cancelled';
+};

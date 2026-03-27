@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { User, Balance, Order } from '@/types';
+import type { User, Balance, Order, OrderHistoryEntry } from '@/types';
 
 export const useAccountStore = defineStore('account', () => {
     const user = ref<User | null>(null);
     const balance = ref<Balance | null>(null);
     const orders = ref<Record<string, Order>>({});
+    const orderHistory = ref<OrderHistoryEntry[]>([]);
     const loadingUser = ref(false);
     const loadingBalance = ref(false);
     const loadingOrders = ref(false);
@@ -62,12 +63,26 @@ export const useAccountStore = defineStore('account', () => {
         }
     }
 
+    async function fetchOrderHistory(accessToken: string, product: string) {
+        try {
+            const res = await fetch(`/api/account/history?product=${product}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json() as { history: OrderHistoryEntry[] };
+            orderHistory.value = data.history;
+        } catch {
+            // ignore — history is best-effort
+        }
+    }
+
     function clear() {
         user.value = null;
         balance.value = null;
         orders.value = {};
+        orderHistory.value = [];
         error.value = null;
     }
 
-    return { user, balance, orders, loadingUser, loadingBalance, loadingOrders, error, fetchUser, fetchBalance, fetchOrders, clear };
+    return { user, balance, orders, orderHistory, loadingUser, loadingBalance, loadingOrders, error, fetchUser, fetchBalance, fetchOrders, fetchOrderHistory, clear };
 });

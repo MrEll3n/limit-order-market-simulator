@@ -1,0 +1,34 @@
+meta {
+  name: Order History
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/account/history?product={{product}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Order History
+
+  Returns the full order history for the authenticated user in a given product.
+  Includes all orders ever placed (open, filled, cancelled), sorted newest first.
+
+  **Auth** — Bearer token required
+
+  **Query parameters**
+  | Param   | Type   | Required | Description             |
+  |---------|--------|----------|-------------------------|
+  | product | string | yes      | Product to query        |
+
+  **Responses**
+  - `200` — `{ userId, product, history: [{ id, timestamp, side, price, quantity, status }] }`
+  - `400` — unknown product
+  - `401` — not authenticated
+}

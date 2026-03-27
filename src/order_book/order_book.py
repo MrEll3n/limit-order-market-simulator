@@ -29,9 +29,12 @@ class OrderBook:
 
         self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
         self.timestamp = 0  # Timestamp in which the order book was last saved
+        self.order_history = {}  # user_id -> list[dict], tracks all orders ever placed
 
     def copy(self):
-        return copy.deepcopy(self)
+        clone = copy.deepcopy(self)
+        clone.order_history = {}  # snapshots do not need history
+        return clone
 
     def reset_book(self):
         """
@@ -47,6 +50,7 @@ class OrderBook:
         }
 
         self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
+        self.order_history = {}
 
         logging.debug("ORDERBOOK: Order book reset.")
 
@@ -71,6 +75,14 @@ class OrderBook:
 
         # Keep track of orders
         self.order_map[order.id] = order
+        self.order_history.setdefault(order.user, []).append({
+            'id': order.id,
+            'timestamp': order.timestamp,
+            'side': order.side,
+            'price': order.price,
+            'quantity': order.quantity,
+            'status': 'open',
+        })
 
         logging.debug(
             f"ORDERBOOK: Added Order {order.id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
@@ -86,6 +98,10 @@ class OrderBook:
             return False
         # Delete the order from the order map
         order = self.order_map[order_id]
+        for entry in reversed(self.order_history.get(order.user, [])):
+            if entry['id'] == order_id:
+                entry['status'] = 'cancelled'
+                break
         del self.order_map[order_id]
 
         # Delete the order from the bids or asks
@@ -109,6 +125,10 @@ class OrderBook:
             logging.warning(f"ORDERBOOK: No orders found at price {price} on the {side} side.")
             return
         order = self.side_map[side][price][0]
+        for entry in reversed(self.order_history.get(order.user, [])):
+            if entry['id'] == order.id:
+                entry['status'] = 'filled'
+                break
         del self.order_map[order.id]
 
         self.side_map[side][price].popleft()
