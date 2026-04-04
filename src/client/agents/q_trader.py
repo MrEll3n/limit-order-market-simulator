@@ -180,5 +180,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     ql_trader = QLearningTrader("ql_trader", "server", config)
+    print("[QLearningTrader] Authenticating...")
     ql_trader.login_via_credentials("ql_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[QLearningTrader] Authenticated successfully.")
+    print("[QLearningTrader] Starting...")
     ql_trader.start_subscribe()

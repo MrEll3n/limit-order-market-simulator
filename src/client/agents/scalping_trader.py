@@ -89,5 +89,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     scalping_trader = ScalpingTrader("scalping_trader", "server", config)
+    print("[ScalpingTrader] Authenticating...")
     scalping_trader.login_via_credentials("scalping_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[ScalpingTrader] Authenticated successfully.")
+    print("[ScalpingTrader] Starting...")
     scalping_trader.start_subscribe()

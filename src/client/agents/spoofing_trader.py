@@ -103,5 +103,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     spoofing_trader = SpoofingTrader("spoofing_trader", "server", config, spoof_distance=0.01)
+    print("[SpoofingTrader] Authenticating...")
     spoofing_trader.login_via_credentials("spoofing_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[SpoofingTrader] Authenticated successfully.")
+    print("[SpoofingTrader] Starting...")
     spoofing_trader.start_subscribe()

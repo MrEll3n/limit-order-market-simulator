@@ -141,5 +141,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     momentum_trader = MomentumTrader("momentum_trader_percentage_change", "server", config, "percentage_change")
+    print("[MomentumTrader] Authenticating...")
     momentum_trader.login_via_credentials("momentum_trader_percentage_change", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[MomentumTrader] Authenticated successfully.")
+    print("[MomentumTrader] Starting...")
     momentum_trader.start_subscribe()

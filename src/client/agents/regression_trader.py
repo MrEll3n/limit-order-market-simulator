@@ -129,5 +129,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     r_trader = RegressionTrader("random_forest_trader", "server", config, model_type="random_forest")
+    print("[RegressionTrader] Authenticating...")
     r_trader.login_via_credentials("random_forest_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[RegressionTrader] Authenticated successfully.")
+    print("[RegressionTrader] Starting...")
     r_trader.start_subscribe()

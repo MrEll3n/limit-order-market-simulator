@@ -66,5 +66,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     swing_trader = RangeTrader("range_trader", "server", config)
+    print("[RangeTrader] Authenticating...")
     swing_trader.login_via_credentials("range_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[RangeTrader] Authenticated successfully.")
+    print("[RangeTrader] Starting...")
     swing_trader.start_subscribe()

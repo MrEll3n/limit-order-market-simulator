@@ -202,5 +202,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     lstm_trader = DeepLearningTrader("lstm_trader", "server", config)
+    print("[DeepLearningTrader] Authenticating...")
     lstm_trader.login_via_credentials("lstm_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[DeepLearningTrader] Authenticated successfully.")
+    print("[DeepLearningTrader] Starting...")
     lstm_trader.start_subscribe()

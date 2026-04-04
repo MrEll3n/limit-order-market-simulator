@@ -122,5 +122,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     swing_trader = SwingTrader("swing_trader", "server", config)
+    print("[SwingTrader] Authenticating...")
     swing_trader.login_via_credentials("swing_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[SwingTrader] Authenticated successfully.")
+    print("[SwingTrader] Starting...")
     swing_trader.start_subscribe()

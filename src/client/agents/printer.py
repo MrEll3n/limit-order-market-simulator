@@ -35,5 +35,8 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
     printer_agent = Printer("test_trader", "server", config)
+    print("[Printer] Authenticating...")
     printer_agent.login_via_credentials("test_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[Printer] Authenticated successfully.")
+    print("[Printer] Starting...")
     printer_agent.start_subscribe()
