@@ -45,6 +45,11 @@ docs {
   | 4 | Me | GET | `/api/auth/me` | Bearer |
   | 5 | Logout | POST | `/api/auth/logout` | cookie |
 
+  ### ⚙️ Config (public)
+  | Seq | Request | Method | URL |
+  |-----|---------|--------|-----|
+  | 1 | Get Config | GET | `/api/config` |
+
   ### 📈 Market (public)
   | Seq | Request | Method | URL |
   |-----|---------|--------|-----|
@@ -65,6 +70,9 @@ docs {
   |-----|---------|--------|-----|
   | 1 | Balance | GET | `/api/account/balance?product=` |
   | 2 | My Orders | GET | `/api/account/orders?product=` |
+  | 3 | Generate API Key | POST | `/api/account/apikey` |
+  | 4 | List API Keys | GET | `/api/account/apikey` |
+  | 5 | Revoke API Key | DELETE | `/api/account/apikey` |
 
   ---
 
@@ -77,12 +85,13 @@ docs {
   | `accessToken` | JWT access token | Automatically after Login / Refresh |
   | `userId` | User trading UUID | Automatically after Login |
   | `orderId` | Last placed order ID | Automatically after Place Order |
+  | `apiKey` | Raw API key | Automatically after Generate API Key |
 
   ---
 
   ## Recommended Testing Flow
 
   ```
-  Register → Login → Products → Order Book → Place Order → Get Order → Modify Order → Cancel Order → Balance → My Orders → Logout
+  Register → Login → Get Config → Products → Order Book → Place Order → Get Order → Modify Order → Cancel Order → Balance → My Orders → Generate API Key → List API Keys → Revoke API Key → Logout
   ```
 }

@@ -19,7 +19,7 @@
             "email": {
                 "required": "Email is required",
                 "notValid": "Email is not valid",
-                "domain": "Only @students.zcu.cz email addresses are allowed"
+                "domain": "Only {domains} email addresses are allowed"
             },
             "password": {
                 "required": "Password is required",
@@ -89,7 +89,7 @@
             "email": {
                 "required": "Email is required",
                 "notValid": "Email is not valid",
-                "domain": "Only @students.zcu.cz email addresses are allowed"
+                "domain": "Only {domains} email addresses are allowed"
             },
             "password": {
                 "required": "Password is required",

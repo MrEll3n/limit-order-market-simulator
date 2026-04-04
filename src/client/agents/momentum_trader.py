@@ -1,5 +1,7 @@
 import pandas as pd
-import json
+import requests
+import os
+from dotenv import load_dotenv
 import numpy as np
 import os
 import sys
@@ -134,7 +136,13 @@ class MomentumTrader(AlgorithmicTrader):
 
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
     momentum_trader = MomentumTrader("momentum_trader_percentage_change", "server", config, "percentage_change")
-    momentum_trader.register(10000)
+    print("[MomentumTrader] Authenticating...")
+    momentum_trader.login_via_credentials("momentum_trader_percentage_change", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[MomentumTrader] Authenticated successfully.")
+    print("[MomentumTrader] Starting...")
     momentum_trader.start_subscribe()

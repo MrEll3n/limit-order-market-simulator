@@ -24,7 +24,7 @@ import useAuth from '@/composables/useAuth';
 import router from '@/router';
 
 const { t } = useI18n();
-const tRegisterPage = (key: string) => t(`registerPage.${key}`);
+const tRegisterPage = (key: string, params?: Record<string, string>) => t(`registerPage.${key}`, params ?? {});
 const toast = useToastHandler();
 const { getAuthData } = useAuth();
 
@@ -76,7 +76,9 @@ const resolver = computed(() =>
             .string()
             .required(tRegisterPage('inputMsgs.email.required'))
             .email(tRegisterPage('inputMsgs.email.notValid'))
-            .test('domain', tRegisterPage('inputMsgs.email.domain'), (value) =>
+            .test('domain', tRegisterPage('inputMsgs.email.domain', {
+                domains: allowedDomains.value.map((d) => `@${d}`).join(', '),
+            }), (value) =>
                 allowedDomains.value.length === 0 ||
                 allowedDomains.value.some((d) => value?.endsWith(`@${d}`))
             ),

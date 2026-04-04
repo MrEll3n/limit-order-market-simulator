@@ -1,0 +1,50 @@
+meta {
+  name: Generate API Key
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/account/apikey
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "my-agent-key"
+  }
+}
+
+script:post-response {
+  const data = res.getBody();
+  if (data.key) {
+    bru.setVar("apiKey", data.key);
+  }
+}
+
+docs {
+  ## Generate API Key
+
+  Generates a new API key for the authenticated user. If a key with the same name already exists, it is deactivated first.
+  The raw key is returned only once — store it securely.
+
+  **Auth** — Bearer token required
+
+  **Body**
+  | Field | Type   | Required | Description        |
+  |-------|--------|----------|--------------------|
+  | name  | string | yes      | Label for the key  |
+
+  **Responses**
+  - `201` — `{ key, name, created_at }` (raw key shown once)
+  - `400` — missing name
+  - `401` — not authenticated
+
+  **Side effects**
+  - Post-response script saves the raw key to `{{apiKey}}` variable
+}

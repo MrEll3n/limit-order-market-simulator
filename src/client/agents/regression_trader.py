@@ -1,7 +1,9 @@
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, BayesianRidge
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
-import json
+import requests
+import os
+from dotenv import load_dotenv
 import os
 import sys
 
@@ -122,7 +124,13 @@ class RegressionTrader(AlgorithmicTrader):
         self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
     r_trader = RegressionTrader("random_forest_trader", "server", config, model_type="random_forest")
-    r_trader.register(10000)
+    print("[RegressionTrader] Authenticating...")
+    r_trader.login_via_credentials("random_forest_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    print("[RegressionTrader] Authenticated successfully.")
+    print("[RegressionTrader] Starting...")
     r_trader.start_subscribe()

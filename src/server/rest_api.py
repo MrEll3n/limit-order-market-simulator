@@ -65,6 +65,8 @@ _INITIAL_BUDGET = None
 _FIXED_FEE = None
 _PERCENTAGE_FEE = None
 _ALLOWED_EMAIL_DOMAINS: list[str] = []
+_TRADING_SESSION: str = ""
+_QUOTE_SESSION: str = ""
 _WebSocketHandler = None   # injected to allow broadcasting after REST orders
 _CORS_ORIGIN = "http://localhost:3000"  # Vue dev server; overridden by init_rest_api
 
@@ -77,6 +79,7 @@ _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
                   initial_budget, fixed_fee, percentage_fee,
                   allowed_email_domains,
+                  trading_session, quote_session,
                   websocket_handler,
                   allowed_origin="http://localhost:3000",
                   jwt_secret: str = ""):
@@ -89,6 +92,7 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     """
     global _cursor, _conn, _user_manager, _product_manager
     global _products, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _ALLOWED_EMAIL_DOMAINS
+    global _TRADING_SESSION, _QUOTE_SESSION
     global _WebSocketHandler, _CORS_ORIGIN, _JWT_SECRET
     _cursor = cursor
     _conn = conn
@@ -99,6 +103,8 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _FIXED_FEE = fixed_fee
     _PERCENTAGE_FEE = percentage_fee
     _ALLOWED_EMAIL_DOMAINS = allowed_email_domains
+    _TRADING_SESSION = trading_session
+    _QUOTE_SESSION = quote_session
     _WebSocketHandler = websocket_handler
     _CORS_ORIGIN = allowed_origin
     _JWT_SECRET = jwt_secret or secrets.token_hex(32)
@@ -361,6 +367,31 @@ class AuditMixin:
 
 
 # ---------------------------------------------------------------------------
+# API key helpers
+# ---------------------------------------------------------------------------
+
+def _generate_api_key() -> str:
+    """Generate a new random API key with a 'sk-' prefix."""
+    return "sk-" + secrets.token_hex(32)
+
+
+def _hash_api_key(key: str) -> str:
+    return bcrypt.hashpw(key.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify_api_key(key: str) -> str | None:
+    """
+    Verify an API key and return the associated email, or None if invalid.
+    Checks all stored key hashes (bcrypt compare).
+    """
+    _cursor.execute("SELECT key_hash, email FROM api_keys WHERE active=1")
+    for key_hash, email in _cursor.fetchall():
+        if bcrypt.checkpw(key.encode(), key_hash.encode()):
+            return email
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Auth handlers
 # ---------------------------------------------------------------------------
 
@@ -370,6 +401,9 @@ class PublicConfigHandler(CORSMixin, tornado.web.RequestHandler):
     def get(self):
         _json_ok(self, {
             "allowedEmailDomains": _ALLOWED_EMAIL_DOMAINS,
+            "PRODUCTS":        _products,
+            "TRADING_SESSION": _TRADING_SESSION,
+            "QUOTE_SESSION":   _QUOTE_SESSION,
         })
 
 
@@ -767,6 +801,79 @@ class OrderDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 # Account handlers  (auth required)
 # ---------------------------------------------------------------------------
 
+class AccountApiKeyHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
+    """
+    POST   /api/account/apikey          – generate a new API key
+    GET    /api/account/apikey          – list existing API keys (metadata only)
+    DELETE /api/account/apikey?id=…     – revoke an API key by id
+    """
+
+    def post(self):
+        email, _, _ = _require_auth(self)
+        if not email:
+            return
+
+        try:
+            body = json.loads(self.request.body or "{}")
+        except json.JSONDecodeError:
+            return _json_error(self, 400, "Invalid JSON")
+
+        name = body.get("name", "").strip() or "default"
+
+        # Deactivate existing key with the same name for this user
+        _cursor.execute("UPDATE api_keys SET active=0 WHERE email=? AND name=? AND active=1", (email, name))
+
+        raw_key = _generate_api_key()
+        key_hash = _hash_api_key(raw_key)
+        created_at = int(time.time())
+
+        _cursor.execute(
+            "INSERT INTO api_keys (key_hash, email, name, created_at) VALUES (?, ?, ?, ?)",
+            (key_hash, email, name, created_at),
+        )
+        _conn.commit()
+        key_id = _cursor.lastrowid
+
+        _json_ok(self, {
+            "id":        key_id,
+            "key":       raw_key,
+            "name":      name,
+            "createdAt": created_at,
+            "note":      "Store this key safely — it will not be shown again.",
+        })
+
+    def get(self):
+        email, _, _ = _require_auth(self)
+        if not email:
+            return
+
+        _cursor.execute(
+            "SELECT id, name, created_at, active FROM api_keys WHERE email=? ORDER BY created_at DESC",
+            (email,),
+        )
+        keys = [{"id": row[0], "name": row[1], "createdAt": row[2], "active": bool(row[3])} for row in _cursor.fetchall()]
+        _json_ok(self, {"keys": keys})
+
+    def delete(self):
+        email, _, _ = _require_auth(self)
+        if not email:
+            return
+
+        try:
+            key_id = int(self.get_argument("id"))
+        except (ValueError, TypeError):
+            return _json_error(self, 400, "Missing or invalid 'id' parameter")
+
+        _cursor.execute(
+            "UPDATE api_keys SET active=0 WHERE id=? AND email=?", (key_id, email)
+        )
+        _conn.commit()
+        if _cursor.rowcount == 0:
+            return _json_error(self, 404, "API key not found")
+
+        _json_ok(self, {"message": "API key revoked"})
+
+
 class AccountBalanceHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """
     GET /api/account/balance?product=…  – balance + portfolio for one product
@@ -1000,6 +1107,7 @@ REST_ROUTES = [
     (r"/api/orders",           OrdersHandler),
     (r"/api/orders/([^/]+)",   OrderDetailHandler),
     # Account
+    (r"/api/account/apikey",    AccountApiKeyHandler),
     (r"/api/account/balance",   AccountBalanceHandler),
     (r"/api/account/orders",    AccountOrdersHandler),
     (r"/api/account/history",   AccountOrderHistoryHandler),

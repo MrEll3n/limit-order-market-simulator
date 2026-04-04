@@ -71,12 +71,23 @@ ALLOWED_EMAIL_DOMAINS = config["ALLOWED_EMAIL_DOMAINS"]
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
-db_path = str(SERVER_DIR / "users.db")
+db_path = str(SERVER_DIR / "market.db")
 if not os.path.exists(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 create_user_db(db_path)  # Create the database and table if they don't exist
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
+
+
+def _verify_fix_api_key(key: str) -> str | None:
+    """Verify an API key for FIX endpoints. Returns the email or None if invalid."""
+    cursor.execute("SELECT key_hash, email FROM api_keys WHERE active=1")
+    for key_hash, email in cursor.fetchall():
+        if bcrypt.checkpw(key.encode(), key_hash.encode()):
+            return email
+    return None
+
+
 protocol = FIXProtocol("server")
 
 # Stable cookie secret - read from env so it survives restarts.
@@ -118,6 +129,18 @@ class MsgHandler(tornado.web.RequestHandler):
         """
         Handles requests from the client.
         """
+        # Verify API key
+        api_key = self.request.headers.get("X-API-Key", "")
+        if not api_key:
+            self.set_status(401)
+            self.write({"error": "Missing X-API-Key header"})
+            return
+        email = _verify_fix_api_key(api_key)
+        if not email:
+            self.set_status(401)
+            self.write({"error": "Invalid API key"})
+            return
+
         try:
             message = json.loads(self.request.body)
         except json.JSONDecodeError:
@@ -548,6 +571,8 @@ def make_app():
         fixed_fee=fixed_fee,
         percentage_fee=percentage_fee,
         allowed_email_domains=ALLOWED_EMAIL_DOMAINS,
+        trading_session=config["TRADING_SESSION"],
+        quote_session=config["QUOTE_SESSION"],
         websocket_handler=WebSocketHandler,
         allowed_origin=os.environ.get("CORS_ORIGIN", "http://localhost:3000"),
         jwt_secret=jwt_secret,

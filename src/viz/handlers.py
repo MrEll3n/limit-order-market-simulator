@@ -8,7 +8,7 @@ import tornado
 config = json.load(open("../config/server_config.json"))
 
 # Database connection
-db_path = os.path.join(os.path.dirname(__file__), "../server/users.db")
+db_path = os.path.join(os.path.dirname(__file__), "../server/market.db")
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
