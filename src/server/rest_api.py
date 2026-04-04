@@ -64,6 +64,7 @@ _products = []
 _INITIAL_BUDGET = None
 _FIXED_FEE = None
 _PERCENTAGE_FEE = None
+_ALLOWED_EMAIL_DOMAINS: list[str] = []
 _WebSocketHandler = None   # injected to allow broadcasting after REST orders
 _CORS_ORIGIN = "http://localhost:3000"  # Vue dev server; overridden by init_rest_api
 
@@ -75,6 +76,7 @@ _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
                   initial_budget, fixed_fee, percentage_fee,
+                  allowed_email_domains,
                   websocket_handler,
                   allowed_origin="http://localhost:3000",
                   jwt_secret: str = ""):
@@ -86,8 +88,8 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
                    JWT_SECRET environment variable (or a strong random fallback).
     """
     global _cursor, _conn, _user_manager, _product_manager
-    global _products, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _WebSocketHandler, _CORS_ORIGIN
-    global _JWT_SECRET
+    global _products, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _ALLOWED_EMAIL_DOMAINS
+    global _WebSocketHandler, _CORS_ORIGIN, _JWT_SECRET
     _cursor = cursor
     _conn = conn
     _user_manager = user_manager
@@ -96,6 +98,7 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _INITIAL_BUDGET = initial_budget
     _FIXED_FEE = fixed_fee
     _PERCENTAGE_FEE = percentage_fee
+    _ALLOWED_EMAIL_DOMAINS = allowed_email_domains
     _WebSocketHandler = websocket_handler
     _CORS_ORIGIN = allowed_origin
     _JWT_SECRET = jwt_secret or secrets.token_hex(32)
@@ -361,6 +364,15 @@ class AuditMixin:
 # Auth handlers
 # ---------------------------------------------------------------------------
 
+class PublicConfigHandler(CORSMixin, tornado.web.RequestHandler):
+    """GET /api/config  — public client configuration"""
+
+    def get(self):
+        _json_ok(self, {
+            "allowedEmailDomains": _ALLOWED_EMAIL_DOMAINS,
+        })
+
+
 class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
     """POST /api/auth/register  — { email, password, confirmPassword }"""
 
@@ -376,8 +388,9 @@ class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
 
         if not email or not password:
             return _json_error(self, 400, "Email and password are required")
-        if "@" not in email:
-            return _json_error(self, 400, "Invalid email address")
+        if not any(email.endswith(f"@{d}") for d in _ALLOWED_EMAIL_DOMAINS):
+            allowed = ", ".join(f"@{d}" for d in _ALLOWED_EMAIL_DOMAINS)
+            return _json_error(self, 400, f"Only {allowed} email addresses are allowed")
         if password != confirm:
             return _json_error(self, 400, "Passwords do not match")
 
@@ -971,6 +984,8 @@ class AccountOrderHistoryHandler(CORSMixin, AuditMixin, tornado.web.RequestHandl
 # ---------------------------------------------------------------------------
 
 REST_ROUTES = [
+    # Public config
+    (r"/api/config",        PublicConfigHandler),
     # Auth
     (r"/api/auth/register", AuthRegisterHandler),
     (r"/api/auth/login",    AuthLoginHandler),

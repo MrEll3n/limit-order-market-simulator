@@ -18,7 +18,8 @@
         "inputMsgs": {
             "email": {
                 "required": "Email is required",
-                "notValid": "Email is not valid"
+                "notValid": "Email is not valid",
+                "domain": "Only @students.zcu.cz email addresses are allowed"
             },
             "password": {
                 "required": "Password is required",
@@ -87,7 +88,8 @@
         "inputMsgs": {
             "email": {
                 "required": "Email is required",
-                "notValid": "Email is not valid"
+                "notValid": "Email is not valid",
+                "domain": "Only @students.zcu.cz email addresses are allowed"
             },
             "password": {
                 "required": "Password is required",

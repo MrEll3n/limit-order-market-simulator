@@ -7,5 +7,6 @@
     "PRODUCTS": ["product1", "product2"],
     "FIXED_FEE": 0.01,
     "PERCENTAGE_FEE": 0.0001,
-    "INITIAL_BUDGET": 10000
+    "INITIAL_BUDGET": 10000,
+    "ALLOWED_EMAIL_DOMAINS": ["students.zcu.cz"]
 }

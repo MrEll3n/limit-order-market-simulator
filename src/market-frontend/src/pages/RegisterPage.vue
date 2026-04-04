@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Vue
-import { ref, onBeforeUnmount, onMounted } from 'vue';
+import { ref, onBeforeUnmount, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 // PrimeVue
@@ -53,28 +53,43 @@ onBeforeUnmount(() => {
 onMounted(() => {
     const authData = getAuthData();
     if (authData?.accessToken) router.replace({ name: 'dashboard' });
+
+    fetch('/api/config')
+        .then((res) => res.json())
+        .then((data) => {
+            if (Array.isArray(data.allowedEmailDomains)) {
+                allowedDomains.value = data.allowedEmailDomains;
+            }
+        })
+        .catch(() => {});
 });
 
 const currentYear = new Date().getFullYear();
 const gitUser = 'MrEll3n';
 const gitRepo = 'limit-order-market-simulator';
 
-const schema = yup.object({
-    email: yup
-        .string()
-        .required(tRegisterPage('inputMsgs.email.required'))
-        .email(tRegisterPage('inputMsgs.email.notValid')),
-    password: yup
-        .string()
-        .required(tRegisterPage('inputMsgs.password.required'))
-        .min(8, tRegisterPage('inputMsgs.password.min')),
-    confirmPassword: yup
-        .string()
-        .required(tRegisterPage('inputMsgs.confirmPassword.required'))
-        .oneOf([yup.ref('password')], tRegisterPage('inputMsgs.confirmPassword.match')),
-});
+const allowedDomains = ref<string[]>([]);
 
-const resolver = yupResolver(schema);
+const resolver = computed(() =>
+    yupResolver(yup.object({
+        email: yup
+            .string()
+            .required(tRegisterPage('inputMsgs.email.required'))
+            .email(tRegisterPage('inputMsgs.email.notValid'))
+            .test('domain', tRegisterPage('inputMsgs.email.domain'), (value) =>
+                allowedDomains.value.length === 0 ||
+                allowedDomains.value.some((d) => value?.endsWith(`@${d}`))
+            ),
+        password: yup
+            .string()
+            .required(tRegisterPage('inputMsgs.password.required'))
+            .min(8, tRegisterPage('inputMsgs.password.min')),
+        confirmPassword: yup
+            .string()
+            .required(tRegisterPage('inputMsgs.confirmPassword.required'))
+            .oneOf([yup.ref('password')], tRegisterPage('inputMsgs.confirmPassword.match')),
+    }))
+);
 
 type RegisterFormValues = {
     email: string;

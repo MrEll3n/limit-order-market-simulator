@@ -69,6 +69,7 @@ products = config["PRODUCTS"]
 fixed_fee = config["FIXED_FEE"]
 percentage_fee = config["PERCENTAGE_FEE"]
 INITIAL_BUDGET = config["INITIAL_BUDGET"]
+ALLOWED_EMAIL_DOMAINS = config["ALLOWED_EMAIL_DOMAINS"]
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
@@ -546,9 +547,10 @@ def make_app():
         product_manager=product_manager,
         products=products,
         initial_budget=INITIAL_BUDGET,
-        websocket_handler=WebSocketHandler,
         fixed_fee=fixed_fee,
         percentage_fee=percentage_fee,
+        allowed_email_domains=ALLOWED_EMAIL_DOMAINS,
+        websocket_handler=WebSocketHandler,
         allowed_origin=os.environ.get("CORS_ORIGIN", "http://localhost:3000"),
         jwt_secret=jwt_secret,
     )
