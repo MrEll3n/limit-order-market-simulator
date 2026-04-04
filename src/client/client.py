@@ -147,6 +147,51 @@ class Trader (Subscriber, ABC):
         self.PROTOCOL.set_sender(uuid)
         return True
 
+    def login_via_apikey(self, api_key: str):
+        """
+        Authenticate all FIX requests using an API key.
+        The key is sent as X-API-Key header with every request.
+        :param api_key: API key generated via the web frontend
+        """
+        session.headers.update({"X-API-Key": api_key})
+
+    def login_via_credentials(self, email: str, password: str) -> str | None:
+        """
+        Authenticate using email and password via the REST API.
+        Automatically generates an API key and uses it for FIX requests.
+        :param email: User email
+        :param password: User password
+        :return: API key if successful, None otherwise
+        """
+        # Step 1: Login via REST to get JWT
+        response = session.post(
+            f"{self.BASE_URL}/api/auth/login",
+            json={"email": email, "password": password},
+        )
+        data = response.json()
+        if not response.ok:
+            print(f"\033[91mLogin failed: {data.get('error', 'Unknown error')}\033[0m")
+            return None
+
+        access_token = data["accessToken"]
+        user_id = data["userId"]
+
+        # Step 2: Generate an API key
+        response = session.post(
+            f"{self.BASE_URL}/api/account/apikey",
+            json={"name": self.PROTOCOL.SENDER.replace("49=", "")},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        data = response.json()
+        if not response.ok:
+            print(f"\033[91mAPI key generation failed: {data.get('error', 'Unknown error')}\033[0m")
+            return None
+
+        api_key = data["key"]
+        self.login_via_apikey(api_key)
+        self.PROTOCOL.set_sender(user_id)
+        return api_key
+
     def register(self, budget=1000):
         """
         Register a new user with the server.

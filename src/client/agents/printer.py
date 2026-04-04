@@ -1,4 +1,6 @@
-import json
+import requests
+import os
+from dotenv import load_dotenv
 from src.client.algorithmic_trader import AlgorithmicTrader
 
 class Printer(AlgorithmicTrader):
@@ -27,8 +29,11 @@ class Printer(AlgorithmicTrader):
         pass
 
 
-# Initialize the Printer agent
-config = json.load(open("../config/server_config.json"))
-printer_agent = Printer("test_trader", "server", config)
-printer_agent.register()
-printer_agent.start_subscribe()
+if __name__ == "__main__":
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
+    printer_agent = Printer("test_trader", "server", config)
+    printer_agent.login_via_credentials("test_trader", os.environ.get("BOT_PASSWORD", "changeme"))
+    printer_agent.start_subscribe()

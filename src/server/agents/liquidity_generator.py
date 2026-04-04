@@ -5,6 +5,7 @@ from abc import ABC
 import json
 import os
 import sys
+from dotenv import load_dotenv
 
 import numpy as np
 
@@ -25,9 +26,18 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         :param volume: Total volume to allocate for generating liquidity
         """
         super().__init__("liquidity_generator", target, config)
-        self.register(0)
+        load_dotenv()
+        print("[LiquidityGenerator] Authenticating...")
+        if not self.login_via_credentials(
+            email=os.environ.get("LIQUIDITY_GENERATOR_EMAIL", "liquidity_generator"),
+            password=os.environ.get("LIQUIDITY_GENERATOR_PASSWORD", "changeme"),
+        ):
+            print("[LiquidityGenerator] Authentication failed. Exiting.")
+            return
+        print("[LiquidityGenerator] Authenticated successfully.")
         self.initialize_liquidity_engine(budget, volume)
         self.products = config["PRODUCTS"]
+        print(f"[LiquidityGenerator] Initialized. Products: {self.products}, Budget: {budget}, Volume: {volume}")
 
     def receive_market_data(self, data):
         pass

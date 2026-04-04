@@ -1,8 +1,7 @@
-import os
 import sys
-import json
+import requests
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.append('../../..')
 
 from src.client.algorithmic_trader import AlgorithmicTrader
 
@@ -26,7 +25,6 @@ class YourTraderName(AlgorithmicTrader):
 
         You *must* implement this method.
         """
-        # You can ignore the product since we are only trading on one product
         product = message["product"]
         order_book = message["order_book"]
 
@@ -63,17 +61,20 @@ class YourTraderName(AlgorithmicTrader):
         pass
 
 
-# Load trading configuration
-# Make sure you run this file from the project root (src/) so the path works correctly
-config = json.load(open("../config/server_config.json"))
+if __name__ == "__main__":
+    HOST = "http://127.0.0.1"
+    PORT = 8888
 
-# Instantiate your trading bot
-your_trader = YourTraderName("trader", "server", config)
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"] = HOST
+    config["PORT"] = PORT
 
-# Authenticate using your UUID — make sure to replace this with your actual ID
-your_trader.login_via_UUID("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+    your_trader = YourTraderName("trader", "server", config)
 
-# DON'T USE THE REGISTER METHOD IT'S ONLY FOR MY PREMADE TRADERS
+    # Option A: authenticate with email + password (generates a new API key)
+    your_trader.login_via_credentials("your@students.zcu.cz", "your_password")
 
-# Start receiving market data and begin trading
-your_trader.start_subscribe()
+    # Option B: authenticate with a saved API key (reuses existing key)
+    # your_trader.login_via_apikey("sk-your-api-key")
+
+    your_trader.start_subscribe()

@@ -6,6 +6,7 @@ from statistics import stdev
 import numpy as np
 import os
 import sys
+from dotenv import load_dotenv
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from src.client.client import AdminTrader
 
@@ -48,8 +49,17 @@ class MarketMaker(AdminTrader, ABC):
         self.initial_num_orders = {product: initial_num_orders for product in self.products} \
             if isinstance(initial_num_orders, int) else initial_num_orders
 
-        self.register(0)
+        load_dotenv()
+        print("[MarketMaker] Authenticating...")
+        if not self.login_via_credentials(
+            email=os.environ.get("MARKET_MAKER_EMAIL", "market_maker"),
+            password=os.environ.get("MARKET_MAKER_PASSWORD", "changeme"),
+        ):
+            print("[MarketMaker] Authentication failed. Exiting.")
+            return
+        print("[MarketMaker] Authenticated successfully.")
         self.initialize_liquidity_engine(budget, volume)
+        print(f"[MarketMaker] Initialized. Products: {self.products}, Budget: {budget}, Volume: {volume}")
 
     def receive_market_data(self, data):
         pass

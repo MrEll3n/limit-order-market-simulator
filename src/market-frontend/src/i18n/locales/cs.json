@@ -19,7 +19,7 @@
             "email": {
                 "required": "E-mail je povinný",
                 "notValid": "E-mail není ve správném formátu",
-                "domain": "Povoleny jsou pouze e-mailové adresy @students.zcu.cz"
+                "domain": "Povoleny jsou pouze e-mailové adresy {domains}"
             },
             "password": {
                 "required": "Heslo je povinné",
@@ -89,7 +89,7 @@
             "email": {
                 "required": "E-mail je povinný",
                 "notValid": "E-mail není ve správném formátu",
-                "domain": "Povoleny jsou pouze e-mailové adresy @students.zcu.cz"
+                "domain": "Povoleny jsou pouze e-mailové adresy {domains}"
             },
             "password": {
                 "required": "Heslo je povinné",

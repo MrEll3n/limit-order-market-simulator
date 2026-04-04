@@ -1,0 +1,22 @@
+meta {
+  name: Get Config
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/config
+  body: none
+  auth: none
+}
+
+docs {
+  ## Get Public Config
+
+  Returns public server configuration for clients and agents.
+
+  **Auth** — none
+
+  **Responses**
+  - `200` — `{ allowedEmailDomains, PRODUCTS, TRADING_SESSION, QUOTE_SESSION }`
+}

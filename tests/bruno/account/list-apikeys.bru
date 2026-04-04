@@ -1,0 +1,27 @@
+meta {
+  name: List API Keys
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/account/apikey
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## List API Keys
+
+  Returns all API keys for the authenticated user (active and inactive).
+
+  **Auth** — Bearer token required
+
+  **Responses**
+  - `200` — `[{ name, created_at, active }]`
+  - `401` — not authenticated
+}

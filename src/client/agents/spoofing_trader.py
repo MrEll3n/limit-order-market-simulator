@@ -1,4 +1,6 @@
-import json
+import requests
+import os
+from dotenv import load_dotenv
 import random
 import time
 import os
@@ -96,7 +98,10 @@ class SpoofingTrader(AlgorithmicTrader):
             self.spoof_orders[product] = []
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
     spoofing_trader = SpoofingTrader("spoofing_trader", "server", config, spoof_distance=0.01)
-    spoofing_trader.register(100000)
+    spoofing_trader.login_via_credentials("spoofing_trader", os.environ.get("BOT_PASSWORD", "changeme"))
     spoofing_trader.start_subscribe()

@@ -1,5 +1,7 @@
 import random
-import json
+import requests
+import os
+from dotenv import load_dotenv
 import time
 import numpy as np
 from collections import deque
@@ -173,7 +175,10 @@ class QLearningTrader(AlgorithmicTrader):
 
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
     ql_trader = QLearningTrader("ql_trader", "server", config)
-    ql_trader.register(10000)
+    ql_trader.login_via_credentials("ql_trader", os.environ.get("BOT_PASSWORD", "changeme"))
     ql_trader.start_subscribe()

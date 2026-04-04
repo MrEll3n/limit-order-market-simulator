@@ -1,0 +1,40 @@
+meta {
+  name: Revoke API Key
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/account/apikey
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "my-agent-key"
+  }
+}
+
+docs {
+  ## Revoke API Key
+
+  Deactivates an API key by name (soft delete — key remains in the database with `active=0`).
+
+  **Auth** — Bearer token required
+
+  **Body**
+  | Field | Type   | Required | Description              |
+  |-------|--------|----------|--------------------------|
+  | name  | string | yes      | Name of the key to revoke |
+
+  **Responses**
+  - `200` — `{ message: "API key revoked" }`
+  - `400` — missing name
+  - `401` — not authenticated
+  - `404` — key not found
+}

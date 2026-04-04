@@ -1,4 +1,6 @@
-import json
+import requests
+import os
+from dotenv import load_dotenv
 import numpy as np
 import time
 import os
@@ -82,7 +84,10 @@ class ScalpingTrader(AlgorithmicTrader):
 
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
     scalping_trader = ScalpingTrader("scalping_trader", "server", config)
-    scalping_trader.register(1000)
+    scalping_trader.login_via_credentials("scalping_trader", os.environ.get("BOT_PASSWORD", "changeme"))
     scalping_trader.start_subscribe()

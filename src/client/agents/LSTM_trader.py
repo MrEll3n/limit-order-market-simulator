@@ -2,7 +2,9 @@ import pandas as pd
 import torch.nn as nn
 import torch.optim as optim
 import torch
-import json
+import requests
+import os
+from dotenv import load_dotenv
 import numpy as np
 from collections import deque
 from sklearn.preprocessing import MinMaxScaler
@@ -195,7 +197,10 @@ class DeepLearningTrader(AlgorithmicTrader):
 
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv()
+    HOST, PORT = "http://127.0.0.1", 8888
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"], config["PORT"] = HOST, PORT
     lstm_trader = DeepLearningTrader("lstm_trader", "server", config)
-    lstm_trader.register(10000)
+    lstm_trader.login_via_credentials("lstm_trader", os.environ.get("BOT_PASSWORD", "changeme"))
     lstm_trader.start_subscribe()

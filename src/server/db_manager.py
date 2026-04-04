@@ -3,7 +3,7 @@ import os
 import sqlite3
 import bcrypt
 
-def create_user_db(db_path='users.db'):
+def create_user_db(db_path='market.db'):
     """
     Create a SQLite database for user management and insert initial users.
     :param db_path: Path to the SQLite database file.
@@ -140,6 +140,18 @@ def create_user_db(db_path='users.db'):
         except sqlite3.Error as e:
             print(f"Error inserting bot {email}: {e}")
 
+    # Create the api_keys table for agent authentication
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            key_hash   TEXT    NOT NULL UNIQUE,
+            email      TEXT    NOT NULL REFERENCES users(email),
+            name       TEXT    NOT NULL,
+            created_at INTEGER NOT NULL,
+            active     INTEGER NOT NULL DEFAULT 1
+        )
+    ''')
+
     # Commit the changes and close the connection
     conn.commit()
     conn.close()
@@ -147,5 +159,5 @@ def create_user_db(db_path='users.db'):
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
-    db_path = 'users.db'
+    db_path = 'market.db'
     create_user_db(db_path)
