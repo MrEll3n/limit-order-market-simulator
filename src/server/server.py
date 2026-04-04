@@ -66,12 +66,9 @@ ID = 0
 # Initialize order books and matching engines for multiple products
 products = config["PRODUCTS"]
 
-# Unrealistically cheap trading fees for testing
-fixed_fee = 0.01
-percentage_fee = 0.0001
-
-# Initial user budget
-INITIAL_BUDGET = 10000
+fixed_fee = config["FIXED_FEE"]
+percentage_fee = config["PERCENTAGE_FEE"]
+INITIAL_BUDGET = config["INITIAL_BUDGET"]
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
@@ -550,6 +547,8 @@ def make_app():
         products=products,
         initial_budget=INITIAL_BUDGET,
         websocket_handler=WebSocketHandler,
+        fixed_fee=fixed_fee,
+        percentage_fee=percentage_fee,
         allowed_origin=os.environ.get("CORS_ORIGIN", "http://localhost:3000"),
         jwt_secret=jwt_secret,
     )

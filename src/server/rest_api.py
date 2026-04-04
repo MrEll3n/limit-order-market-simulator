@@ -61,7 +61,9 @@ _conn = None
 _user_manager = None
 _product_manager = None
 _products = []
-_INITIAL_BUDGET = 10000
+_INITIAL_BUDGET = None
+_FIXED_FEE = None
+_PERCENTAGE_FEE = None
 _WebSocketHandler = None   # injected to allow broadcasting after REST orders
 _CORS_ORIGIN = "http://localhost:3000"  # Vue dev server; overridden by init_rest_api
 
@@ -72,7 +74,8 @@ _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
 
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
-                  initial_budget, websocket_handler,
+                  initial_budget, fixed_fee, percentage_fee,
+                  websocket_handler,
                   allowed_origin="http://localhost:3000",
                   jwt_secret: str = ""):
     """
@@ -83,7 +86,7 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
                    JWT_SECRET environment variable (or a strong random fallback).
     """
     global _cursor, _conn, _user_manager, _product_manager
-    global _products, _INITIAL_BUDGET, _WebSocketHandler, _CORS_ORIGIN
+    global _products, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _WebSocketHandler, _CORS_ORIGIN
     global _JWT_SECRET
     _cursor = cursor
     _conn = conn
@@ -91,6 +94,8 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _product_manager = product_manager
     _products = products
     _INITIAL_BUDGET = initial_budget
+    _FIXED_FEE = fixed_fee
+    _PERCENTAGE_FEE = percentage_fee
     _WebSocketHandler = websocket_handler
     _CORS_ORIGIN = allowed_origin
     _JWT_SECRET = jwt_secret or secrets.token_hex(32)
@@ -626,10 +631,7 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
             })
 
         if status is not False:
-            # Apply trading fee
-            fixed_fee = 0.01
-            percentage_fee = 0.0001
-            fee = fixed_fee + price * quantity * percentage_fee
+            fee = _FIXED_FEE + price * quantity * _PERCENTAGE_FEE
             _user_manager.users[user_id].budget -= fee
             _user_manager.increment_user_orders_counter(user_id)
 
