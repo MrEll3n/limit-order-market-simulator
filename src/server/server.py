@@ -37,9 +37,8 @@ from src.protocols.FIXProtocol import FIXProtocol
 from src.server.db_manager import create_user_db
 from src.server.rest_api import REST_ROUTES, init_rest_api
 
-# Configure logging to use colorlog
-handler = logging.StreamHandler()
-handler.setFormatter(colorlog.ColoredFormatter(
+colorlog_handler = logging.StreamHandler()
+colorlog_handler.setFormatter(colorlog.ColoredFormatter(
     "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
     log_colors={
         'DEBUG': 'cyan',
@@ -49,7 +48,6 @@ handler.setFormatter(colorlog.ColoredFormatter(
         'CRITICAL': 'bold_red',
     }
 ))
-logging.basicConfig(level=logging.INFO, handlers=[handler])
 logging.getLogger("tornado.access").disabled = True
 
 SERVER_DIR = Path(__file__).resolve().parent
@@ -662,7 +660,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Trading server")
     parser.add_argument('-l', '--load', action='store_true', help="Load the server data from the last checkpoint")
+    parser.add_argument('--log-level', default='ERROR',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        help="Logging level (default: ERROR)")
     args = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, args.log_level), handlers=[colorlog_handler])
 
     if args.load:
         load_data()
