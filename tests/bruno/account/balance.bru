@@ -17,7 +17,7 @@ auth:bearer {
 docs {
   ## Account Balance (single product)
 
-  Returns the current budget and share balance for the authenticated user for a specific product.
+  Returns the current balance and share balance for the authenticated user for a specific product.
 
   **Auth** — Bearer token required
 
@@ -27,7 +27,7 @@ docs {
   | product | string | yes      | Product to query        |
 
   **Responses**
-  - `200` — `{ userId, email, product, budget, postBuyBudget, currentBalance: { balance, volume, postSellVolume } }`
+  - `200` — `{ balance, portfolioValue, products: { [product]: { postSellVolume, price, value } } }`
   - `400` — unknown product
   - `401` — not authenticated
 }

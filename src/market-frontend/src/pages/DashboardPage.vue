@@ -9,7 +9,7 @@ import { useLocaleStore, useMarketStore, useAccountStore, useOrderBookStore } fr
 import type { OrderBookSnapshot } from '@/types';
 import { storeToRefs } from 'pinia';
 import { usePageReady } from '@/composables/usePageReady';
-import { orderHistogramOptions, obMidPricePlugin, getObHistogramOptions, plotLayout, plotConfig } from '@/config/chartConfig';
+import { orderMidPricePlugin, getOrderHistogramOptions, obMidPricePlugin, getObHistogramOptions, plotLayout, plotConfig } from '@/config/chartConfig';
 
 
 
@@ -121,6 +121,7 @@ const obVisibleLabels = computed(() => {
 });
 
 const obHistogramOptions = computed(() => getObHistogramOptions(midPrice.value, obVisibleLabels.value));
+const orderHistogramOptions = computed(() => getOrderHistogramOptions(midPrice.value));
 
 // Price chart
 const MAX_POINTS = 1000;
@@ -400,7 +401,7 @@ onMounted(async () => {
                 <!-- Active Orders -->
                 <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset h-9/12 grow">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
-                    <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" class="h-full w-full" />
+                    <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" :plugins="[orderMidPricePlugin]" class="h-full w-full" />
                 </Fieldset>
                 <!-- Trading Details -->
                 <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="h-3/12 grow">
@@ -595,5 +596,32 @@ onMounted(async () => {
     font-family: var(--p-font-family) !important;
     font-size: var(--p-form-field-sm-font-size) !important;
     fill: var(--p-text-muted-color) !important;
+}
+
+.plotly-notifier {
+    position: fixed !important;
+    top: 20px !important;
+    right: 90px !important;
+    left: unset !important;
+    width: fit-content !important;
+}
+
+.plotly-notifier .notifier-note {
+    background-color: color-mix(in srgb, var(--p-toast-secondary-background) 85%, transparent);
+    backdrop-filter: blur(var(--p-toast-blur));
+    border-color: var(--p-toast-secondary-border-color);
+    border-style: solid;
+    border-width: var(--p-toast-border-width);
+    border-radius: var(--p-toast-border-radius);
+    box-shadow: var(--p-toast-secondary-shadow);
+    color: var(--p-toast-secondary-color);
+    width: var(--p-toast-width);
+    padding: var(--p-toast-content-padding);
+    gap: var(--p-toast-content-gap);
+    margin: 0;
+    transition: opacity var(--p-toast-transition-duration);
+}
+.plotly-notifier .notifier-note .notifier-close {
+    color: var(--p-checkbox-icon-checked-color);
 }
 </style>

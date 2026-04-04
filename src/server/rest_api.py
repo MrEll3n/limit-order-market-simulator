@@ -609,6 +609,7 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         timestamp = time.time_ns()
         order = Order(str(_srv.ID), timestamp, user_id, side, quantity, price)
         _srv.ID += 1
+        original_quantity = quantity
 
         status = _product_manager.get_matching_engine(product, timestamp).match_order(order)
 
@@ -620,7 +621,7 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
                 'timestamp': order.timestamp,
                 'side': order.side,
                 'price': order.price,
-                'quantity': order.quantity,
+                'quantity': original_quantity,
                 'status': 'filled',
             })
 
@@ -753,14 +754,22 @@ class OrderDetailHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 
 class AccountBalanceHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """
-    GET /api/account/balance?product=…  – budget + balances for one product
-    GET /api/account/balance            – budget + balances for all products
+    GET /api/account/balance?product=…  – balance + portfolio for one product
+    GET /api/account/balance            – balance + portfolio for all products
     """
 
     def get(self):
         email, user_id, role = _require_auth(self)
         if not email:
             return
+
+        def _mid_price(p):
+            ob = _product_manager.get_order_book(p, False)
+            bids = list(ob.bids.keys())
+            asks = list(ob.asks.keys())
+            if not bids or not asks:
+                return None
+            return (max(bids) + min(asks)) / 2
 
         product = self.get_argument("product", None)
         _update_post_buy_budget(user_id)
@@ -772,37 +781,39 @@ class AccountBalanceHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 
             _update_post_sell_volume(user_id, product)
             ob = _product_manager.get_order_book(product, False)
-            cb = ob.user_balance[user_id]
-
+            volume = ob.user_balance[user_id]["post_sell_volume"]
+            price = _mid_price(product)
             return _json_ok(self, {
-                "userId": user_id,
-                "email": email,
-                "product": product,
-                "budget": user.budget,
-                "postBuyBudget": user.post_buy_budget,
-                "currentBalance": {
-                    "balance": cb["balance"],
-                    "volume": cb["volume"],
-                    "postSellVolume": cb["post_sell_volume"],
+                "balance": user.post_buy_budget,
+                "portfolioValue": round(volume * price, 2) if price is not None else None,
+                "products": {
+                    product: {
+                        "postSellVolume": volume,
+                        "price": price,
+                        "value": round(volume * price, 2) if price is not None else None,
+                    },
                 },
             })
 
+        total_value = 0.0
         products_balance = {}
         for p in _products:
             _update_post_sell_volume(user_id, p)
             ob = _product_manager.get_order_book(p, False)
-            cb = ob.user_balance[user_id]
+            volume = ob.user_balance[user_id]["post_sell_volume"]
+            price = _mid_price(p)
+            value = round(volume * price, 2) if price is not None else None
+            if value is not None:
+                total_value += value
             products_balance[p] = {
-                "balance": cb["balance"],
-                "volume": cb["volume"],
-                "postSellVolume": cb["post_sell_volume"],
+                "postSellVolume": volume,
+                "price": price,
+                "value": value,
             }
 
         _json_ok(self, {
-            "userId": user_id,
-            "email": email,
-            "budget": user.budget,
-            "postBuyBudget": user.post_buy_budget,
+            "balance": user.post_buy_budget,
+            "portfolioValue": round(total_value, 2),
             "products": products_balance,
         })
 
@@ -934,6 +945,7 @@ class AdminRolesHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         _json_ok(self, {"roles": [{"name": r[0], "description": r[1]} for r in rows]})
 
 
+
 class AccountOrderHistoryHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     """GET /api/account/history?product=…  — user's full order history for one product"""
 
@@ -971,9 +983,9 @@ REST_ROUTES = [
     (r"/api/orders",           OrdersHandler),
     (r"/api/orders/([^/]+)",   OrderDetailHandler),
     # Account
-    (r"/api/account/balance",  AccountBalanceHandler),
-    (r"/api/account/orders",   AccountOrdersHandler),
-    (r"/api/account/history",  AccountOrderHistoryHandler),
+    (r"/api/account/balance",   AccountBalanceHandler),
+    (r"/api/account/orders",    AccountOrdersHandler),
+    (r"/api/account/history",   AccountOrderHistoryHandler),
     # Admin
     (r"/api/admin/users",            AdminUsersHandler),
     (r"/api/admin/users/([^/]+)",    AdminUserDetailHandler),

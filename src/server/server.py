@@ -49,7 +49,7 @@ handler.setFormatter(colorlog.ColoredFormatter(
         'CRITICAL': 'bold_red',
     }
 ))
-logging.basicConfig(level=logging.ERROR, handlers=[handler])
+logging.basicConfig(level=logging.INFO, handlers=[handler])
 logging.getLogger("tornado.access").disabled = True
 
 SERVER_DIR = Path(__file__).resolve().parent
@@ -583,14 +583,17 @@ def load_data():
             data = pickle.load(f)
 
         # Restore product manager and user manager states
+        max_id_global = 0
         for product, product_data in data.items():
             order_book_obj = OrderBook()
-            order_book = product_data["order_books"][-1]
-            order_book, max_id = order_book_obj.from_JSON(order_book)
+            order_book, max_id = order_book_obj.from_JSON(product_data["order_books"][-1])
+            order_book.order_history = product_data.get("order_history", {})
             product_manager.set_order_book(product, order_book)
-            ID = max(ID, max_id) + 1
+            product_manager.historical_order_books[product] = product_data["order_books"][:-1]
+            max_id_global = max(max_id_global, max_id)
 
-            user_manager.users = data[product]["users"]
+        ID = max_id_global + 1
+        user_manager.users = next(iter(data.values()))["users"]
         print("Data successfully loaded from", latest_file)
     except Exception as e:
         print("Error loading data:", e)
@@ -604,7 +607,12 @@ def save_data():
     for product in products:
         report = product_manager.get_historical_order_books(product, -1)
         report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
-        data_to_save[product] = {"order_books": report, "users": user_manager.users}
+        order_history = product_manager.get_order_book(product, False).order_history
+        data_to_save[product] = {
+            "order_books": report,
+            "order_history": order_history,
+            "users": user_manager.users,
+        }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     file_name = str(DATA_DIR / f"{time.strftime('%Y-%m-%d_%H-%M-%S')}-server_data.pickle")
     with open(file_name, 'wb') as f:

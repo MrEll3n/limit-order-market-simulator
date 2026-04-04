@@ -5,15 +5,15 @@ export type User = {
 };
 
 export type Balance = {
-    budget: number;
-    postBuyBudget: number;
+    balance: number;
+    portfolioValue: number;
     products: Record<string, ProductBalance>;
 };
 
 export type ProductBalance = {
-    balance: number;
-    volume: number;
     postSellVolume: number;
+    price: number | null;
+    value: number | null;
 };
 
 export type OrderHistoryEntry = {

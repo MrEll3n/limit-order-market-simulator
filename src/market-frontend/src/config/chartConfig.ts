@@ -1,17 +1,56 @@
 import type Plotly from 'plotly.js-dist';
 
-// Active orders histogram (horizontal bar)
-export const orderHistogramOptions = {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: { legend: { display: false } },
-    scales: {
-        x: { grid: { color: 'rgba(128,128,128,0.15)' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
-        y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+// Active orders histogram (horizontal bar) — vertical line at mid price
+export const orderMidPricePlugin = {
+    id: 'orderMidPriceLine',
+    afterDraw(chart: any) {
+        const mid = chart.options.plugins?.orderMidPriceLine?.value;
+        if (mid == null) return;
+        const xAxis = chart.scales['x'];
+        const yAxis = chart.scales['y'];
+        if (!xAxis || !yAxis) return;
+        const labels = (chart.data.labels as string[]).map(Number);
+        if (labels.length === 0) return;
+        let y: number;
+        if (mid <= labels[0]) {
+            y = yAxis.getPixelForValue(0);
+        } else if (mid >= labels[labels.length - 1]) {
+            y = yAxis.getPixelForValue(labels.length - 1);
+        } else {
+            let i = 0;
+            while (i < labels.length - 1 && labels[i + 1] <= mid) i++;
+            const t = (mid - labels[i]) / (labels[i + 1] - labels[i]);
+            y = yAxis.getPixelForValue(i) + t * (yAxis.getPixelForValue(i + 1) - yAxis.getPixelForValue(i));
+        }
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(xAxis.left, y);
+        ctx.lineTo(xAxis.right, y);
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
     },
 };
+
+export function getOrderHistogramOptions(midPrice: number | null) {
+    return {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+            legend: { display: true, labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 12, boxHeight: 12 } },
+            orderMidPriceLine: { value: midPrice },
+        },
+        scales: {
+            x: { grid: { color: 'rgba(128,128,128,0.15)' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+            y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+        },
+    };
+}
 
 // Order book histogram — vertical line at mid price
 export const obMidPricePlugin = {

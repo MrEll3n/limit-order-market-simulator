@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import useAuth from '@/composables/useAuth';
 import { usePageReady } from '@/composables/usePageReady';
-import { useAccountStore } from '@/stores';
+import { useAccountStore, useMarketStore, useOrderBookStore } from '@/stores';
 import { storeToRefs } from 'pinia';
 import Popover from 'primevue/popover';
 
@@ -15,6 +15,22 @@ const { pageReady } = usePageReady();
 
 const accountStore = useAccountStore();
 const { user, balance } = storeToRefs(accountStore);
+
+const marketStore = useMarketStore();
+const { selectedProduct } = storeToRefs(marketStore);
+
+const orderBookStore = useOrderBookStore();
+const { midPrice } = storeToRefs(orderBookStore);
+
+const portfolioValue = computed(() => {
+    if (!balance.value) return null;
+    let total = 0;
+    for (const [product, pb] of Object.entries(balance.value.products)) {
+        const price = product === selectedProduct.value ? (midPrice.value ?? pb.price) : pb.price;
+        if (price !== null) total += pb.postSellVolume * price;
+    }
+    return total;
+});
 
 const op = ref<InstanceType<typeof Popover> | null>(null);
 const togglePopover = (event: MouseEvent) => {
@@ -35,11 +51,11 @@ const togglePopover = (event: MouseEvent) => {
                 <div v-else class="flex flex-row gap-6">
                     <div class="flex flex-col items-end leading-tight">
                         <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.balance') }}</span>
-                        <span class="text-base font-semibold">{{ balance?.postBuyBudget.toFixed(2) }}</span>
+                        <span class="text-base font-semibold">{{ balance?.balance.toFixed(2) }}</span>
                     </div>
                     <div class="flex flex-col items-end leading-tight">
                         <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.portfolio') }}</span>
-                        <span class="text-base font-semibold">{{ balance?.budget.toFixed(2) }}</span>
+                        <span class="text-base font-semibold">{{ portfolioValue?.toFixed(2) }}</span>
                     </div>
                 </div>
                 <Avatar icon="pi pi-user" size="large" style="cursor: pointer" @click="togglePopover" />
