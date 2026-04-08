@@ -51,7 +51,7 @@ def _validate_env():
     # Must be set
     for var in (
         "JWT_SECRET", "COOKIE_SECRET", "ALLOWED_EMAIL_DOMAINS",
-        "HOST", "PORT", "VIZ_PORT", "HTTPS", "CORS_ORIGIN",
+        "HOST", "PORT", "HTTPS", "CORS_ORIGIN",
         "BOT_PASSWORD", "MARKET_MAKER_EMAIL", "MARKET_MAKER_PASSWORD",
         "LIQUIDITY_GENERATOR_EMAIL", "LIQUIDITY_GENERATOR_PASSWORD",
     ):
@@ -59,7 +59,7 @@ def _validate_env():
             errors.append(f"{var} is not set")
 
     # Format checks (only if the value is present)
-    for var in ("PORT", "VIZ_PORT"):
+    for var in ("PORT",):
         val = os.environ.get(var, "")
         if val:
             try:
@@ -152,7 +152,6 @@ protocol = FIXProtocol("server")
 # Set COOKIE_SECRET env var in production; falls back to a random value.
 HOST = os.environ.get("HOST", "http://127.0.0.1")
 PORT = int(os.environ.get("PORT", 8888))
-VIZ_PORT = int(os.environ.get("VIZ_PORT", 8080))
 
 cookie_secret = os.environ.get("COOKIE_SECRET") or os.urandom(32)
 
