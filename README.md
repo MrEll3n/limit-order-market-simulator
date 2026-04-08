@@ -142,6 +142,7 @@ pip install -r requirements.txt
 cd src/market-frontend
 bun install
 ```
+> devnote: bun is my personal to-go choice, but can ofcourse use other runtimes aswell
 
 ### 3. Configuration
 
