@@ -1,53 +1,92 @@
+import argparse
 import asyncio
+import glob
+import json
+import logging
 import os
+import pickle
 import secrets
+import signal
 import sqlite3
+import sys
+import time
+import traceback
+import uuid
+from itertools import islice
 from pathlib import Path
 
-# Load environment variables from .env file (ignored if file does not exist)
-from dotenv import load_dotenv
-load_dotenv()
-import sys
-import glob
-import signal
-import traceback
-import pickle
+import bcrypt
+import colorlog
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
-from tornado import httpserver
-import json
-import logging
-import colorlog
-import time
-import uuid
-import bcrypt
-import argparse
-from itertools import islice
+
+# Load environment variables from .env file (ignored if file does not exist)
+from dotenv import load_dotenv
 from sortedcontainers import SortedDict
+from tornado import httpserver
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from src.order_book.product_manager import TradingProductManager
-from src.server.user_manager import UserManager
 from src.order_book.order import Order
 from src.order_book.order_book import OrderBook
+from src.order_book.product_manager import TradingProductManager
 from src.protocols.FIXProtocol import FIXProtocol
 from src.server.db_manager import create_user_db
 from src.server.rest_api import REST_ROUTES, init_rest_api
+from src.server.user_manager import UserManager
+
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+if not _env_path.exists():
+    print(f"WARNING: .env file not found at {_env_path}. Using default values.")
+load_dotenv(_env_path)
+
+
+def _validate_env():
+    errors = []
+
+    if not os.environ.get("JWT_SECRET"):
+        errors.append("JWT_SECRET is not set")
+    if not os.environ.get("COOKIE_SECRET"):
+        errors.append("COOKIE_SECRET is not set")
+    if not os.environ.get("ALLOWED_EMAIL_DOMAINS"):
+        errors.append("ALLOWED_EMAIL_DOMAINS is not set")
+
+    for var, default in [("PORT", "8888"), ("VIZ_PORT", "8080")]:
+        val = os.environ.get(var, default)
+        try:
+            port = int(val)
+            if not (1 <= port <= 65535):
+                errors.append(f"{var}={val} is not a valid port number (must be 1–65535)")
+        except ValueError:
+            errors.append(f"{var}={val} is not a valid integer")
+
+    host = os.environ.get("HOST", "http://127.0.0.1")
+    if not host.startswith("http://") and not host.startswith("https://"):
+        errors.append(f"HOST={host} must start with http:// or https://")
+
+    if errors:
+        for msg in errors:
+            print(f"ERROR: {msg}")
+        sys.exit(1)
+
+
+_validate_env()
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 colorlog_handler = logging.StreamHandler()
-colorlog_handler.setFormatter(colorlog.ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
-    log_colors={
-        'DEBUG': 'cyan',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'bold_red',
-    }
-))
+colorlog_handler.setFormatter(
+    colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "bold_red",
+        },
+    )
+)
 logging.getLogger("tornado.access").disabled = True
 
 SERVER_DIR = Path(__file__).resolve().parent
@@ -67,7 +106,11 @@ products = config["PRODUCTS"]
 fixed_fee = config["FIXED_FEE"]
 percentage_fee = config["PERCENTAGE_FEE"]
 INITIAL_BUDGET = config["INITIAL_BUDGET"]
-ALLOWED_EMAIL_DOMAINS = config["ALLOWED_EMAIL_DOMAINS"]
+ALLOWED_EMAIL_DOMAINS = [
+    d.strip()
+    for d in os.environ.get("ALLOWED_EMAIL_DOMAINS", "").split(",")
+    if d.strip()
+]
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
@@ -92,6 +135,10 @@ protocol = FIXProtocol("server")
 
 # Stable cookie secret - read from env so it survives restarts.
 # Set COOKIE_SECRET env var in production; falls back to a random value.
+HOST = os.environ.get("HOST", "http://127.0.0.1")
+PORT = int(os.environ.get("PORT", 8888))
+VIZ_PORT = int(os.environ.get("VIZ_PORT", 8080))
+
 cookie_secret = os.environ.get("COOKIE_SECRET") or os.urandom(32)
 
 # Secret key for signing JWT access tokens.
@@ -180,14 +227,24 @@ class MsgHandler(tornado.web.RequestHandler):
         :param user_ID: User ID
         """
         initial_budget = user_manager.users[user_ID].budget
-        balance = sum(product_manager.get_order_book(product, False)
-                      .user_balance[user_ID]["balance"] for product in products)
+        balance = sum(
+            product_manager.get_order_book(product, False).user_balance[user_ID][
+                "balance"
+            ]
+            for product in products
+        )
 
         # Get all buy orders of the user and update the post-buy budget
-        buy_orders_value = sum(order.price * order.quantity for product in products
-                               if (order_book := product_manager.get_order_book(product, False))
-                               for order in order_book.get_orders_by_user(user_ID) if order.side == "buy")
-        user_manager.users[user_ID].post_buy_budget = initial_budget - buy_orders_value + balance
+        buy_orders_value = sum(
+            order.price * order.quantity
+            for product in products
+            if (order_book := product_manager.get_order_book(product, False))
+            for order in order_book.get_orders_by_user(user_ID)
+            if order.side == "buy"
+        )
+        user_manager.users[user_ID].post_buy_budget = (
+            initial_budget - buy_orders_value + balance
+        )
 
     @staticmethod
     def update_user_post_sell_volume(user_ID, product):
@@ -196,12 +253,20 @@ class MsgHandler(tornado.web.RequestHandler):
         :param user_ID: User ID
         :param product: Product name
         """
-        volume = product_manager.get_order_book(product, False).user_balance[user_ID]["volume"]
+        volume = product_manager.get_order_book(product, False).user_balance[user_ID][
+            "volume"
+        ]
         # Get all sell orders of the user and update the post-sell volume
-        sell_orders_volume = sum(order.quantity for order in product_manager.get_order_book(product, False)
-                                 .get_orders_by_user(user_ID) if order.side == "sell")
+        sell_orders_volume = sum(
+            order.quantity
+            for order in product_manager.get_order_book(
+                product, False
+            ).get_orders_by_user(user_ID)
+            if order.side == "sell"
+        )
         product_manager.get_order_book(product, False).user_balance[user_ID][
-            "post_sell_volume"] = volume - sell_orders_volume
+            "post_sell_volume"
+        ] = volume - sell_orders_volume
 
 
 class TradingHandler(MsgHandler):
@@ -214,9 +279,13 @@ class TradingHandler(MsgHandler):
         """
         user_ID = user_manager.user_name_exists(message["user"])
         if user_ID:
-            return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return existing user ID
+            return protocol.encode(
+                {"user": user_ID, "msg_type": "RegisterResponse"}
+            )  # Return existing user ID
         if user_manager.user_exists(message["user"]):
-            return protocol.encode({"user": message["user"], "msg_type": "RegisterResponse"})  # Return existing user ID
+            return protocol.encode(
+                {"user": message["user"], "msg_type": "RegisterResponse"}
+            )  # Return existing user ID
 
         # Check if the user is in the database
         cursor.execute("SELECT * FROM users WHERE email=?", (message["user"],))
@@ -225,7 +294,9 @@ class TradingHandler(MsgHandler):
             raise ValueError("User not found in the database")
         user_ID = str(uuid.uuid4())
         user_manager.add_user(message["user"], user_ID, INITIAL_BUDGET)
-        return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return new user ID
+        return protocol.encode(
+            {"user": user_ID, "msg_type": "RegisterResponse"}
+        )  # Return new user ID
 
     @staticmethod
     def initialize_liq_engine(message):
@@ -239,11 +310,17 @@ class TradingHandler(MsgHandler):
         volume = message["volume"]
         for product in products:
             order_book = product_manager.get_order_book(product, False)
-            order_book.modify_user_balance(user, 0, volume[product] if isinstance(volume, dict) else volume)
+            order_book.modify_user_balance(
+                user, 0, volume[product] if isinstance(volume, dict) else volume
+            )
             user_manager.set_user_budget(user, budget)
-        user_balance = {product: product_manager.get_order_book(product, False).user_balance[user]
-                        for product in products}
-        return protocol.encode({"user_balance": user_balance, "msg_type": "UserBalance"})
+        user_balance = {
+            product: product_manager.get_order_book(product, False).user_balance[user]
+            for product in products
+        }
+        return protocol.encode(
+            {"user_balance": user_balance, "msg_type": "UserBalance"}
+        )
 
     @staticmethod
     def match_order(message):
@@ -256,32 +333,55 @@ class TradingHandler(MsgHandler):
         global ID
         product = message["product"]
         if not product_exists(product):
-            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+            return protocol.encode(
+                {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+            )
 
         # Check order details viability
         if message["order"]["side"] not in ["buy", "sell"]:
-            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
-        if round(message["order"]["quantity"]) <= 0 or round(message["order"]["price"], 2) <= 0:
-            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+            return protocol.encode(
+                {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+            )
+        if (
+            round(message["order"]["quantity"]) <= 0
+            or round(message["order"]["price"], 2) <= 0
+        ):
+            return protocol.encode(
+                {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+            )
         # Check extreme values
-        max_int = 2 ** 31 - 1
-        if message["order"]["quantity"] > max_int - 1 or message["order"]["price"] > max_int - 1:
-            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+        max_int = 2**31 - 1
+        if (
+            message["order"]["quantity"] > max_int - 1
+            or message["order"]["price"] > max_int - 1
+        ):
+            return protocol.encode(
+                {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+            )
 
         # If the order is a buy order, check if the user has enough budget to place the order
         if message["order"]["side"] == "buy":
             TradingHandler.update_user_post_buy_budget(message["order"]["user"])
-            if user_manager.users[message["order"]["user"]].post_buy_budget < message["order"]["quantity"] * \
-                    message["order"]["price"]:
-                return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+            if (
+                user_manager.users[message["order"]["user"]].post_buy_budget
+                < message["order"]["quantity"] * message["order"]["price"]
+            ):
+                return protocol.encode(
+                    {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+                )
 
         # If the order is a sell order, check if the user has enough shares to sell
         if message["order"]["side"] == "sell":
-            TradingHandler.update_user_post_sell_volume(message["order"]["user"], product)
-            user_shares = product_manager.get_order_book(product, False).user_balance[message["user"]][
-                "post_sell_volume"]
+            TradingHandler.update_user_post_sell_volume(
+                message["order"]["user"], product
+            )
+            user_shares = product_manager.get_order_book(product, False).user_balance[
+                message["user"]
+            ]["post_sell_volume"]
             if user_shares < message["order"]["quantity"]:
-                return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+                return protocol.encode(
+                    {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+                )
 
         timestamp = time.time_ns()
         order = Order(
@@ -290,13 +390,19 @@ class TradingHandler(MsgHandler):
             message["order"]["user"],
             message["order"]["side"],
             message["order"]["quantity"],
-            message["order"]["price"]
+            message["order"]["price"],
         )
         ID += 1  # Increment order ID
-        status = product_manager.get_matching_engine(product, timestamp).match_order(order)  # Match order
+        status = product_manager.get_matching_engine(product, timestamp).match_order(
+            order
+        )  # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
-        response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
-        if status is not False:  # If the order was added to the order book or fully matched -> apply trading fee
+        response = protocol.encode(
+            {"order_id": order.id, "status": status, "msg_type": "ExecutionReport"}
+        )
+        if (
+            status is not False
+        ):  # If the order was added to the order book or fully matched -> apply trading fee
             percentage_based_fee = order.price * order.quantity * percentage_fee
             total_fee = fixed_fee + percentage_based_fee
             user_manager.users[message["order"]["user"]].budget -= total_fee
@@ -305,8 +411,14 @@ class TradingHandler(MsgHandler):
 
             # Broadcast the changed order book to all clients
             broadcast_response = protocol.encode(
-                {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(censor=True),
-                 "product": product, "msg_type": "MarketDataSnapshot"})
+                {
+                    "order_book": product_manager.get_order_book(
+                        product, False
+                    ).jsonify_order_book(censor=True),
+                    "product": product,
+                    "msg_type": "MarketDataSnapshot",
+                }
+            )
             asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
         return response
 
@@ -319,22 +431,46 @@ class TradingHandler(MsgHandler):
         """
         product = message["product"]
         if not product_exists(product):
-            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportCancel"})
+            return protocol.encode(
+                {"order_id": -1, "status": False, "msg_type": "ExecutionReportCancel"}
+            )
         order_id = message["order_id"]
         order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
-            return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
+            return protocol.encode(
+                {
+                    "order_id": order_id,
+                    "status": False,
+                    "msg_type": "ExecutionReportCancel",
+                }
+            )
         if order.user != message["user"]:  # Check if the user is the owner of the order
-            return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
-        product_manager.get_order_book(product, timestamp=time.time_ns()).delete_order(order_id)
+            return protocol.encode(
+                {
+                    "order_id": order_id,
+                    "status": False,
+                    "msg_type": "ExecutionReportCancel",
+                }
+            )
+        product_manager.get_order_book(product, timestamp=time.time_ns()).delete_order(
+            order_id
+        )
         protocol.set_target(order.user)
 
         # Broadcast the order book to all clients
         broadcast_response = protocol.encode(
-            {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(censor=True),
-             "product": product, "msg_type": "MarketDataSnapshot"})
+            {
+                "order_book": product_manager.get_order_book(
+                    product, False
+                ).jsonify_order_book(censor=True),
+                "product": product,
+                "msg_type": "MarketDataSnapshot",
+            }
+        )
         asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
-        return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
+        return protocol.encode(
+            {"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"}
+        )
 
     @staticmethod
     def modify_order_qty(message):
@@ -345,22 +481,38 @@ class TradingHandler(MsgHandler):
         """
         product = message["product"]
         if not product_exists(product):
-            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportModify"})
+            return protocol.encode(
+                {"order_id": -1, "status": False, "msg_type": "ExecutionReportModify"}
+            )
         order_id = message["order_id"]
         quantity = message["quantity"]
         order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
-            return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportModify"})
-        ret = product_manager.get_order_book(product, time.time_ns()).modify_order_qty(order_id, quantity)
+            return protocol.encode(
+                {
+                    "order_id": order_id,
+                    "status": False,
+                    "msg_type": "ExecutionReportModify",
+                }
+            )
+        ret = product_manager.get_order_book(product, time.time_ns()).modify_order_qty(
+            order_id, quantity
+        )
         protocol.set_target(order.user)
-        return protocol.encode({"order_id": order_id, "status": ret, "msg_type": "ExecutionReportModify"})
+        return protocol.encode(
+            {"order_id": order_id, "status": ret, "msg_type": "ExecutionReportModify"}
+        )
 
     msg_type_handlers = {
         "RegisterRequest": lambda message: TradingHandler.register(message),
-        "InitializeLiquidityEngine": lambda message: TradingHandler.initialize_liq_engine(message),
+        "InitializeLiquidityEngine": lambda message: (
+            TradingHandler.initialize_liq_engine(message)
+        ),
         "NewOrderSingle": lambda message: TradingHandler.match_order(message),
         "OrderCancelRequest": lambda message: TradingHandler.delete_order(message),
-        "OrderModifyRequestQty": lambda message: TradingHandler.modify_order_qty(message)
+        "OrderModifyRequestQty": lambda message: TradingHandler.modify_order_qty(
+            message
+        ),
     }
 
     def post(self):
@@ -397,15 +549,29 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         depth = message.get("depth", -1)
         if not product_exists(product):
-            return protocol.encode({"order_book": None, "product": product, "msg_type": "MarketDataSnapshot"})
+            return protocol.encode(
+                {
+                    "order_book": None,
+                    "product": product,
+                    "msg_type": "MarketDataSnapshot",
+                }
+            )
         order_book = product_manager.get_order_book(product, False)
         order_book = order_book.copy()
         if depth > 0:
-            order_book.bids = SortedDict(islice(reversed(order_book.bids.items()), depth))
+            order_book.bids = SortedDict(
+                islice(reversed(order_book.bids.items()), depth)
+            )
             order_book.asks = SortedDict(islice(order_book.asks.items(), depth))
 
         order_book_data = order_book.jsonify_order_book(censor=True)
-        return protocol.encode({"order_book": order_book_data, "product": product, "msg_type": "MarketDataSnapshot"})
+        return protocol.encode(
+            {
+                "order_book": order_book_data,
+                "product": product,
+                "msg_type": "MarketDataSnapshot",
+            }
+        )
 
     @staticmethod
     def user_data(message):
@@ -421,7 +587,9 @@ class QuoteHandler(MsgHandler):
         user_orders = order_book.get_orders_by_user(message["user"])
         user_orders = {order.id: order.__json__() for order in user_orders}
         protocol.set_target(message["user"])
-        return protocol.encode({"user_orders": user_orders, "msg_type": "UserOrderStatus"})
+        return protocol.encode(
+            {"user_orders": user_orders, "msg_type": "UserOrderStatus"}
+        )
 
     @classmethod
     def user_balance(cls, message):
@@ -445,13 +613,19 @@ class QuoteHandler(MsgHandler):
         # ]
 
         # Add current balance
-        user_balance = product_manager.get_order_book(product, False).user_balance[message["user"]]
+        user_balance = product_manager.get_order_book(product, False).user_balance[
+            message["user"]
+        ]
         # user_balances[-1]['timestamp'] = time.time_ns()
         protocol.set_target(message["user"])
-        user_balances = {"current_balance": user_balance,
-                         "budget": user_manager.users[message["user"]].budget,
-                         "post_buy_budget": user_manager.users[message["user"]].post_buy_budget}
-        return protocol.encode({"user_balance": user_balances, "msg_type": "UserBalance"})
+        user_balances = {
+            "current_balance": user_balance,
+            "budget": user_manager.users[message["user"]].budget,
+            "post_buy_budget": user_manager.users[message["user"]].post_buy_budget,
+        }
+        return protocol.encode(
+            {"user_balance": user_balances, "msg_type": "UserBalance"}
+        )
 
     @staticmethod
     def get_report(message):
@@ -463,9 +637,13 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"report": None, "msg_type": "CaptureReport"})
-        report = product_manager.get_historical_order_books(product, message["history_len"])
+        report = product_manager.get_historical_order_books(
+            product, message["history_len"]
+        )
         # Add current order book to the historical report
-        report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
+        report.append(
+            product_manager.get_order_book(product, False).copy().jsonify_order_book()
+        )
         return protocol.encode({"history": report, "msg_type": "CaptureReport"})
 
     msg_type_handlers = {
@@ -473,7 +651,7 @@ class QuoteHandler(MsgHandler):
         "MarketDataRequest": lambda message: QuoteHandler.order_book_request(message),
         "UserOrderStatusRequest": lambda message: QuoteHandler.user_data(message),
         "UserBalanceRequest": lambda message: QuoteHandler.user_balance(message),
-        "CaptureReportRequest": lambda message: QuoteHandler.get_report(message)
+        "CaptureReportRequest": lambda message: QuoteHandler.get_report(message),
     }
 
     def get(self):
@@ -487,6 +665,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
     """
     Websocket handler for message exchange between the server and the client.
     """
+
     clients = set()
     clients_lock = None  # Lock for thread-safe access
 
@@ -504,8 +683,14 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         logging.info("New WebSocket connection")
         for product in products:
             snapshot = protocol.encode(
-                {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(censor=True),
-                 "product": product, "msg_type": "MarketDataSnapshot"})
+                {
+                    "order_book": product_manager.get_order_book(
+                        product, False
+                    ).jsonify_order_book(censor=True),
+                    "product": product,
+                    "msg_type": "MarketDataSnapshot",
+                }
+            )
             self.write_message(json.dumps({"message": snapshot.decode()}))
 
     def on_close(self):
@@ -535,7 +720,9 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         closed_clients = set()
 
         async with cls.clients_lock:
-            for client in list(cls.clients):  # Use list to avoid modifying the set during iteration
+            for client in list(
+                cls.clients
+            ):  # Use list to avoid modifying the set during iteration
                 if not client.ws_connection or client.ws_connection.is_closing():
                     closed_clients.add(client)
                     continue
@@ -603,17 +790,21 @@ def load_data():
         list_of_files = glob.glob(str(DATA_DIR / "*-server_data.pickle"))
         latest_file = max(list_of_files, key=os.path.getctime)
 
-        with open(latest_file, 'rb') as f:
+        with open(latest_file, "rb") as f:
             data = pickle.load(f)
 
         # Restore product manager and user manager states
         max_id_global = 0
         for product, product_data in data.items():
             order_book_obj = OrderBook()
-            order_book, max_id = order_book_obj.from_JSON(product_data["order_books"][-1])
+            order_book, max_id = order_book_obj.from_JSON(
+                product_data["order_books"][-1]
+            )
             order_book.order_history = product_data.get("order_history", {})
             product_manager.set_order_book(product, order_book)
-            product_manager.historical_order_books[product] = product_data["order_books"][:-1]
+            product_manager.historical_order_books[product] = product_data[
+                "order_books"
+            ][:-1]
             max_id_global = max(max_id_global, max_id)
 
         ID = max_id_global + 1
@@ -630,7 +821,9 @@ def save_data():
     data_to_save = {}
     for product in products:
         report = product_manager.get_historical_order_books(product, -1)
-        report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
+        report.append(
+            product_manager.get_order_book(product, False).copy().jsonify_order_book()
+        )
         order_history = product_manager.get_order_book(product, False).order_history
         data_to_save[product] = {
             "order_books": report,
@@ -638,8 +831,10 @@ def save_data():
             "users": user_manager.users,
         }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    file_name = str(DATA_DIR / f"{time.strftime('%Y-%m-%d_%H-%M-%S')}-server_data.pickle")
-    with open(file_name, 'wb') as f:
+    file_name = str(
+        DATA_DIR / f"{time.strftime('%Y-%m-%d_%H-%M-%S')}-server_data.pickle"
+    )
+    with open(file_name, "wb") as f:
         pickle.dump(data_to_save, f)
 
 
@@ -684,21 +879,31 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
     parser = argparse.ArgumentParser(description="Trading server")
-    parser.add_argument('-l', '--load', action='store_true', help="Load the server data from the last checkpoint")
-    parser.add_argument('--log-level', default='ERROR',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                        help="Logging level (default: ERROR)")
+    parser.add_argument(
+        "-l",
+        "--load",
+        action="store_true",
+        help="Load the server data from the last checkpoint",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="ERROR",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level (default: ERROR)",
+    )
     args = parser.parse_args()
 
-    logging.basicConfig(level=getattr(logging, args.log_level), handlers=[colorlog_handler])
+    logging.basicConfig(
+        level=getattr(logging, args.log_level), handlers=[colorlog_handler]
+    )
 
     if args.load:
         load_data()
 
     app = make_app()
     app = httpserver.HTTPServer(app)
-    app.listen(config["PORT"])
+    app.listen(PORT)
 
-    print(f"Server started on {config['HOST']}:{config['PORT']}")
+    print(f"Server started on {HOST}:{PORT}")
     shutdown_server(app)
     tornado.ioloop.IOLoop.current().start()

@@ -1,12 +1,8 @@
 {
-    "PORT": 8888,
-    "VIZ_PORT": 8080,
-    "HOST": "http://127.0.0.1",
     "TRADING_SESSION": "trade",
     "QUOTE_SESSION": "quote",
     "PRODUCTS": ["product1", "product2"],
     "FIXED_FEE": 0.01,
     "PERCENTAGE_FEE": 0.0001,
-    "INITIAL_BUDGET": 10000,
-    "ALLOWED_EMAIL_DOMAINS": ["students.zcu.cz", "example.com"]
+    "INITIAL_BUDGET": 10000
 }
