@@ -15,6 +15,11 @@ import uuid
 from itertools import islice
 from pathlib import Path
 
+# Ensure both project root and src/ are on sys.path regardless of cwd
+_server_dir = Path(__file__).resolve().parent
+sys.path.append(str(_server_dir.parent.parent))  # project root  → enables `from src.*`
+sys.path.append(str(_server_dir.parent))         # src/          → enables `from order_book.*`
+
 import bcrypt
 import colorlog
 import tornado.ioloop
@@ -43,25 +48,38 @@ load_dotenv(_env_path)
 def _validate_env():
     errors = []
 
-    if not os.environ.get("JWT_SECRET"):
-        errors.append("JWT_SECRET is not set")
-    if not os.environ.get("COOKIE_SECRET"):
-        errors.append("COOKIE_SECRET is not set")
-    if not os.environ.get("ALLOWED_EMAIL_DOMAINS"):
-        errors.append("ALLOWED_EMAIL_DOMAINS is not set")
+    # Must be set
+    for var in (
+        "JWT_SECRET", "COOKIE_SECRET", "ALLOWED_EMAIL_DOMAINS",
+        "HOST", "PORT", "VIZ_PORT", "HTTPS", "CORS_ORIGIN",
+        "BOT_PASSWORD", "MARKET_MAKER_EMAIL", "MARKET_MAKER_PASSWORD",
+        "LIQUIDITY_GENERATOR_EMAIL", "LIQUIDITY_GENERATOR_PASSWORD",
+    ):
+        if not os.environ.get(var):
+            errors.append(f"{var} is not set")
 
-    for var, default in [("PORT", "8888"), ("VIZ_PORT", "8080")]:
-        val = os.environ.get(var, default)
-        try:
-            port = int(val)
-            if not (1 <= port <= 65535):
-                errors.append(f"{var}={val} is not a valid port number (must be 1–65535)")
-        except ValueError:
-            errors.append(f"{var}={val} is not a valid integer")
+    # Format checks (only if the value is present)
+    for var in ("PORT", "VIZ_PORT"):
+        val = os.environ.get(var, "")
+        if val:
+            try:
+                port = int(val)
+                if not (1 <= port <= 65535):
+                    errors.append(f"{var}={val} is not a valid port number (must be 1–65535)")
+            except ValueError:
+                errors.append(f"{var}={val} is not a valid integer")
 
-    host = os.environ.get("HOST", "http://127.0.0.1")
-    if not host.startswith("http://") and not host.startswith("https://"):
+    host = os.environ.get("HOST", "")
+    if host and not host.startswith("http://") and not host.startswith("https://"):
         errors.append(f"HOST={host} must start with http:// or https://")
+
+    https_val = os.environ.get("HTTPS", "").lower()
+    if https_val and https_val not in ("true", "false"):
+        errors.append(f"HTTPS={https_val} must be 'true' or 'false'")
+
+    cors = os.environ.get("CORS_ORIGIN", "")
+    if cors and not cors.startswith("http://") and not cors.startswith("https://"):
+        errors.append(f"CORS_ORIGIN={cors} must start with http:// or https://")
 
     if errors:
         for msg in errors:
@@ -70,9 +88,6 @@ def _validate_env():
 
 
 _validate_env()
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 colorlog_handler = logging.StreamHandler()
 colorlog_handler.setFormatter(
