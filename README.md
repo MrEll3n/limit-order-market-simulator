@@ -113,7 +113,7 @@ The platform enables:
 
 ## Technologies Used
 
-- **Python 3.9+**
+- **Python 3.11.9
 - **Tornado** (asynchronous web server)
 - **Vue.js** (web frontend)
 - **NumPy**, **Pandas** (data processing)
