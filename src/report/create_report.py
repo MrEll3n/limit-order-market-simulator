@@ -232,19 +232,16 @@ def plot_best_traders_interactive(users, timestamps, mid_prices, top_10, censor=
             font=dict(size=20)  # Increase title font size
         ),
         xaxis=dict(
-            title="Timestamp",
-            titlefont=dict(size=16),  # Increase x-axis title font size
-            tickfont=dict(size=14)  # Increase x-axis tick font size
+            title=dict(text="Timestamp", font=dict(size=16)),
+            tickfont=dict(size=14)
         ),
         yaxis=dict(
-            title="Balance",
-            titlefont=dict(size=16),  # Increase y-axis title font size
-            tickfont=dict(size=14)  # Increase y-axis tick font size
+            title=dict(text="Balance", font=dict(size=16)),
+            tickfont=dict(size=14)
         ),
         yaxis2=dict(
-            title="Mid Price",
-            titlefont=dict(size=16),  # Increase secondary y-axis title font size
-            tickfont=dict(size=14)  # Increase secondary y-axis tick font size
+            title=dict(text="Mid Price", font=dict(size=16)),
+            tickfont=dict(size=14)
         ),
         legend=dict(
             font=dict(size=14)  # Increase legend font size
