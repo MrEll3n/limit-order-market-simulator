@@ -8,6 +8,8 @@ import datetime
 import tornado
 import os
 import sys
+from dotenv import load_dotenv
+load_dotenv()
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -32,6 +34,9 @@ from handlers import MainHandler, LoginHandler, LogoutHandler, RegisterHandler
 # =====================
 logging.getLogger('bokeh').setLevel(logging.INFO)
 config = json.load(open("../config/server_config.json"))
+config["HOST"] = os.environ.get("HOST", "http://127.0.0.1")
+config["PORT"] = int(os.environ.get("PORT", 8888))
+config["VIZ_PORT"] = int(os.environ.get("VIZ_PORT", 8080))
 
 # =====================
 # Backend Variables
