@@ -152,7 +152,7 @@ Copy `.env.example` to `.env` and fill in your values:
 cp .env.example .env
 ```
 
-You can configure in `.env`:
+You can and should configure `.env`:
 
 - Server host and port
 - JWT and cookie secrets
@@ -190,7 +190,7 @@ python server/agents/market_maker.py
 python server/agents/liquidity_generator.py
 ```
 
-Custom agents can be implemented in: `client/agents/`
+Custom agents can be implemented in: `client/agents/`. You can use `example_trader.py` as template.
 
 ---
 
@@ -198,7 +198,6 @@ Custom agents can be implemented in: `client/agents/`
 
 ```bash
 cd src/market-frontend
-bun install
 bun run dev
 ```
 
