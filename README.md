@@ -130,6 +130,8 @@ git clone https://github.com/Jivl00/limit-order-book-simulator
 cd limit-order-book-simulator
 ```
 
+---
+
 ### 2. Install Dependencies
 
 **Server (Python):**
@@ -143,6 +145,8 @@ cd src/market-frontend
 bun install
 ```
 > devnote: bun is my personal to-go choice, but can ofcourse use other runtimes aswell
+
+---
 
 ### 3. Configuration
 
