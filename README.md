@@ -113,9 +113,9 @@ The platform enables:
 
 ## Technologies Used
 
-- **Python 3.9+**
+- **Python 3.11.9
 - **Tornado** (asynchronous web server)
-- **Bokeh** (interactive visualization)
+- **Vue.js** (web frontend)
 - **NumPy**, **Pandas** (data processing)
 - **Jupyter Notebook** (analysis & reporting)
 
@@ -130,23 +130,41 @@ git clone https://github.com/Jivl00/limit-order-book-simulator
 cd limit-order-book-simulator
 ```
 
+---
+
 ### 2. Install Dependencies
 
+**Server (Python):**
 ```bash
 pip install -r requirements.txt
 ```
 
+**Frontend (Vue.js):**
+```bash
+cd src/market-frontend
+bun install
+```
+> devnote: bun is my personal to-go choice, but can ofcourse use other runtimes aswell
+
+---
+
 ### 3. Configuration
 
-Edit: `config/server_config.json`
+Copy `.env.example` to `.env` and fill in your values:
 
-You can configure:
+```bash
+cp .env.example .env
+```
 
-- Server IP address
-- Ports
-- API endpoints
-- Product definitions
-- Simulation parameters
+You can and should configure `.env`:
+
+- Server host and port
+- JWT and cookie secrets
+- Allowed email domains
+- Bot credentials
+- CORS origin and HTTPS flag
+
+Application parameters (products, fees, budgets) are configured in `config/server_config.json`.
 
 ---
 
@@ -176,23 +194,24 @@ python server/agents/market_maker.py
 python server/agents/liquidity_generator.py
 ```
 
-Custom agents can be implemented in: `client/agents/`
+Custom agents can be implemented in: `client/agents/`. You can use `example_trader.py` as template.
 
 ---
 
 ### 6. Launch the Web Interface
 
 ```bash
-python viz/main_page.py
+cd src/market-frontend
+bun run dev
 ```
 
-Access via: `http://<IP_ADDRESS>:<VIZ_PORT>`
+Access via: `http://<IP_ADDRESS>:3000`
 
 ---
 
 ## Simulation Analysis
 
-Open the reporting notebook: `viz/report/report.ipynb`
+Open the reporting notebook: `src/report/report.ipynb`
 
 The notebook allows:
 
