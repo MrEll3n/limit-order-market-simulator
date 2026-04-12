@@ -5,6 +5,7 @@ from abc import ABC
 import json
 import os
 import sys
+import requests
 from dotenv import load_dotenv
 
 import numpy as np
@@ -26,7 +27,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         :param volume: Total volume to allocate for generating liquidity
         """
         super().__init__("liquidity_generator", target, config)
-        load_dotenv()
+        load_dotenv(os.path.join(os.path.dirname(__file__), '../../../.env'))
         print("[LiquidityGenerator] Authenticating...")
         if not self.login_via_credentials(
             email=os.environ.get("LIQUIDITY_GENERATOR_EMAIL", "liquidity_generator"),
@@ -90,6 +91,11 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
 
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../../../.env'))
+    HOST = os.environ.get("HOST", "http://127.0.0.1")
+    PORT = int(os.environ.get("PORT", 8888))
+    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config["HOST"] = HOST
+    config["PORT"] = PORT
     liquidity_generator = SyntheticLiquidityProvider("server", config)
     liquidity_generator.generate_liquidity()

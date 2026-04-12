@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.protocols.FIXProtocol import FIXProtocol
 
 # Configuration for the Trader
-CONFIG = json.load(open("../config/server_config.json"))
+CONFIG = json.load(open(os.path.join(os.path.dirname(__file__), "../config/server_config.json")))
 
 class TestTrader:
     """

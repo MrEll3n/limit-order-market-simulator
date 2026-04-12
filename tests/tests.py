@@ -89,7 +89,7 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
             )
             # Periodically check if the server has started
             server_started = False
-            config = json.load(open("../config/server_config.json"))
+            config = json.load(open(os.path.join(os.path.dirname(__file__), "../config/server_config.json")))
             for _ in range(10):
                 try:
                     port = config["PORT"]

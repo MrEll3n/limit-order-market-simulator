@@ -98,7 +98,7 @@ class SpoofingTrader(AlgorithmicTrader):
             self.spoof_orders[product] = []
 
 if __name__ == "__main__":
-    load_dotenv()
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../../../.env'))
     HOST, PORT = "http://127.0.0.1", 8888
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"], config["PORT"] = HOST, PORT
