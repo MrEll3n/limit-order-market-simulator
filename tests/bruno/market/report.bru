@@ -7,13 +7,19 @@ meta {
 get {
   url: {{baseUrl}}/api/market/report?product={{product}}&history_len=10
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
 }
 
 docs {
   ## Report
 
-  Returns historical order book snapshots for a given product. Public — no auth required.
+  Returns historical order book snapshots for a given product. Requires authentication.
+
+  User IDs are censored and balances are not included in the response.
 
   **Query parameters**
   | Param       | Type   | Required | Description                              |
@@ -21,7 +27,12 @@ docs {
   | product     | string | yes      | Product name (e.g. `product1`)           |
   | history_len | int    | no       | Number of past snapshots (-1 = all)      |
 
-  **Responses**
-  - `200` — `{ product, history: [ ...orderBookSnapshots ] }`
+  **Response shape depends on role:**
+  - `user` — snapshots contain only `{ Price, Quantity }` per order, no user IDs or balances
+  - `admin` — full snapshots including user IDs and balances
+
+  **Status codes**
+  - `200` — ok
   - `400` — unknown product
+  - `401` — missing or invalid token
 }

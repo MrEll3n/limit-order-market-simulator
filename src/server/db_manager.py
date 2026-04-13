@@ -72,6 +72,24 @@ def create_user_db(db_path='market.db'):
         )
     ''')
 
+    def _hash(plain: str) -> str:
+        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+    # Insert initial admin account (role = 'admin')
+    admin_email    = os.environ.get("ADMIN_EMAIL")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+
+    if not admin_email or not admin_password:
+        logging.warning("ADMIN_EMAIL or ADMIN_PASSWORD not set — skipping admin account creation.")
+    else:
+        try:
+            cursor.execute(
+                "INSERT INTO users (email, password, role) VALUES (?, ?, 'admin')",
+                (admin_email, _hash(admin_password)),
+            )
+        except sqlite3.IntegrityError:
+            cursor.execute("UPDATE users SET role='admin' WHERE email=?", (admin_email,))
+
     # Insert initial bot accounts (role = 'bot')
     # Passwords are read from environment variables and stored hashed with bcrypt.
     bot_password           = os.environ.get("BOT_PASSWORD")
@@ -93,9 +111,6 @@ def create_user_db(db_path='market.db'):
     bot_password           = bot_password or _DEFAULT
     market_maker_password  = market_maker_password or _DEFAULT
     liquidity_gen_password = liquidity_gen_password or _DEFAULT
-
-    def _hash(plain: str) -> str:
-        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
     bot_passwords = {
         'market_maker':       _hash(market_maker_password),

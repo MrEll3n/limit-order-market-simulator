@@ -574,6 +574,10 @@ class MarketOrderBookHandler(CORSMixin, tornado.web.RequestHandler):
         from sortedcontainers import SortedDict
         from itertools import islice
 
+        email, _user_id, role = _require_auth(self)
+        if not email:
+            return
+
         product = self.get_argument("product", None)
         if not product or product not in _products:
             return _json_error(self, 400, f"Unknown product. Valid: {_products}")
@@ -584,20 +588,42 @@ class MarketOrderBookHandler(CORSMixin, tornado.web.RequestHandler):
             ob.bids = SortedDict(islice(reversed(ob.bids.items()), depth))
             ob.asks = SortedDict(islice(ob.asks.items(), depth))
 
-        _json_ok(self, {"product": product, "orderBook": ob.jsonify_order_book(censor=True)})
+        is_admin = role == "admin"
+        snapshot = json.loads(ob.jsonify_order_book(censor=not is_admin))
+        if not is_admin:
+            snapshot.pop("UserBalance", None)
+            for order in snapshot.get("Bids", []) + snapshot.get("Asks", []):
+                order.pop("User", None)
+                order.pop("ID", None)
+        _json_ok(self, {"product": product, "orderBook": snapshot})
 
 
 class MarketReportHandler(CORSMixin, tornado.web.RequestHandler):
     """GET /api/market/report?product=...&history_len=..."""
 
     def get(self):
+        email, _user_id, role = _require_auth(self)
+        if not email:
+            return
+
         product = self.get_argument("product", None)
         if not product or product not in _products:
             return _json_error(self, 400, f"Unknown product. Valid: {_products}")
 
+        is_admin = role == "admin"
+
+        def _process(ob_json_str):
+            data = json.loads(ob_json_str)
+            if not is_admin:
+                data.pop("UserBalance", None)
+                for order in data.get("Bids", []) + data.get("Asks", []):
+                    order.pop("User", None)
+                    order.pop("ID", None)
+            return data
+
         history_len = int(self.get_argument("history_len", -1))
-        report = list(_product_manager.get_historical_order_books(product, history_len))
-        report.append(_product_manager.get_order_book(product, False).copy().jsonify_order_book())
+        report = [_process(ob) for ob in _product_manager.get_historical_order_books(product, history_len)]
+        report.append(_process(_product_manager.get_order_book(product, False).copy().jsonify_order_book()))
         _json_ok(self, {"product": product, "history": report})
 
 

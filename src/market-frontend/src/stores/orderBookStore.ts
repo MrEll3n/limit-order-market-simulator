@@ -53,7 +53,11 @@ export const useOrderBookStore = defineStore('orderBook', () => {
     async function fetchSnapshot(product: string) {
         loading.value = true;
         try {
-            const res = await fetch(`/api/market/orderbook?product=${product}`);
+            const authData = localStorage.getItem('auth-data');
+            const token = authData ? (JSON.parse(authData) as { accessToken?: string }).accessToken : null;
+            const res = await fetch(`/api/market/orderbook?product=${product}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
             if (!res.ok) return;
             const data = await res.json() as { orderBook: OrderBookSnapshot | string };
             const snapshot = typeof data.orderBook === 'string'
