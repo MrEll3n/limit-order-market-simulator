@@ -1,0 +1,34 @@
+meta {
+  name: Resend Verification Email
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/auth/resend-verification
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "mrellen@example.com"
+  }
+}
+
+docs {
+  ## Resend Verification Email
+
+  Sends a new verification email to the given address if it is registered
+  but not yet verified. Always returns 200 to avoid leaking which emails
+  are registered.
+
+  **Body**
+  | Field | Type   | Required | Description       |
+  |-------|--------|----------|-------------------|
+  | email | string | yes      | Registered e-mail |
+
+  **Responses**
+  - `200` — `{ message: "If your email is registered and unverified, a new link has been sent." }`
+  - `400` — missing email field
+}

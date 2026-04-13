@@ -35,10 +35,11 @@ def create_user_db(db_path='market.db'):
     # Create the users table if it doesn't exist
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            email    TEXT    NOT NULL UNIQUE,
-            password TEXT    NOT NULL,
-            role     TEXT    NOT NULL DEFAULT 'user' REFERENCES roles(name)
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            email          TEXT    NOT NULL UNIQUE,
+            password       TEXT    NOT NULL,
+            role           TEXT    NOT NULL DEFAULT 'user' REFERENCES roles(name),
+            email_verified INTEGER NOT NULL DEFAULT 0
         )
     ''')
 
@@ -47,6 +48,24 @@ def create_user_db(db_path='market.db'):
         cursor.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
     except Exception:
         pass  # Column already exists
+
+    # Add email_verified column to existing databases
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
+        # Mark existing admin and bot accounts as already verified
+        cursor.execute("UPDATE users SET email_verified=1 WHERE role IN ('admin', 'bot')")
+    except Exception:
+        pass  # Column already exists
+
+    # Table for storing one-time email verification tokens
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            token      TEXT    PRIMARY KEY,
+            email      TEXT    NOT NULL,
+            expires_at INTEGER NOT NULL,
+            used       INTEGER NOT NULL DEFAULT 0
+        )
+    ''')
 
     # Create the refresh_tokens table for JWT refresh token storage
     cursor.execute('''
@@ -84,11 +103,13 @@ def create_user_db(db_path='market.db'):
     else:
         try:
             cursor.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, ?, 'admin')",
+                "INSERT INTO users (email, password, role, email_verified) VALUES (?, ?, 'admin', 1)",
                 (admin_email, _hash(admin_password)),
             )
         except sqlite3.IntegrityError:
-            cursor.execute("UPDATE users SET role='admin' WHERE email=?", (admin_email,))
+            cursor.execute(
+                "UPDATE users SET role='admin', email_verified=1 WHERE email=?", (admin_email,)
+            )
 
     # Insert initial bot accounts (role = 'bot')
     # Passwords are read from environment variables and stored hashed with bcrypt.
@@ -143,13 +164,13 @@ def create_user_db(db_path='market.db'):
         hashed = bot_passwords.get(email, default_hash)
         try:
             cursor.execute(
-                "INSERT INTO users (email, password, role) VALUES (?, ?, 'bot')",
+                "INSERT INTO users (email, password, role, email_verified) VALUES (?, ?, 'bot', 1)",
                 (email, hashed),
             )
         except sqlite3.IntegrityError:
-            # Already exists — make sure role is set to 'bot'
+            # Already exists — make sure role and email_verified are set correctly
             cursor.execute(
-                "UPDATE users SET role='bot' WHERE email=? AND role='user'",
+                "UPDATE users SET role='bot', email_verified=1 WHERE email=? AND role='user'",
                 (email,),
             )
         except sqlite3.Error as e:

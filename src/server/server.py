@@ -777,6 +777,11 @@ def make_app():
         websocket_handler=WebSocketHandler,
         allowed_origin=os.environ.get("CORS_ORIGIN", "http://localhost:3000"),
         jwt_secret=jwt_secret,
+        smtp_host=os.environ.get("SMTP_HOST", ""),
+        smtp_port=int(os.environ.get("SMTP_PORT", "587")),
+        smtp_user=os.environ.get("SMTP_USER", ""),
+        smtp_password=os.environ.get("SMTP_PASSWORD", ""),
+        smtp_from=os.environ.get("SMTP_FROM", ""),
     )
 
     routes = [

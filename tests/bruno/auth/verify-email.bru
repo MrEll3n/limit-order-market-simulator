@@ -1,0 +1,27 @@
+meta {
+  name: Verify Email
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/auth/verify-email?token={{verificationToken}}
+  body: none
+  auth: none
+}
+
+docs {
+  ## Verify Email
+
+  Confirms a user's email address using the one-time token sent during registration.
+  Set the `verificationToken` Bruno variable to the token from the verification link.
+
+  **Query params**
+  | Param | Type   | Required | Description                     |
+  |-------|--------|----------|---------------------------------|
+  | token | string | yes      | One-time verification token     |
+
+  **Responses**
+  - `200` — `{ message: "Email verified successfully. You can now log in." }`
+  - `400` — missing token, invalid token, already used, or expired
+}

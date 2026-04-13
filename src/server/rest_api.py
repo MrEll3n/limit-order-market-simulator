@@ -44,9 +44,12 @@ import json
 import logging
 import os
 import secrets
+import smtplib
 import time
 import uuid
 from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import bcrypt
 import jwt
@@ -75,6 +78,17 @@ _JWT_SECRET: str = ""                    # injected by init_rest_api
 _ACCESS_TOKEN_TTL  = 15 * 60            # 15 minutes  (seconds)
 _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
 
+# Email verification
+_EMAIL_VERIFICATION_TTL = 24 * 3600    # 24 hours (seconds)
+
+# SMTP configuration — injected by init_rest_api
+_SMTP_HOST: str = ""
+_SMTP_PORT: int = 587
+_SMTP_USER: str = ""
+_SMTP_PASSWORD: str = ""
+_SMTP_FROM: str = ""
+_SMTP_ENABLED: bool = False            # False → skip sending, log token instead
+
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
                   initial_budget, fixed_fee, percentage_fee,
@@ -82,18 +96,26 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
                   trading_session, quote_session,
                   websocket_handler,
                   allowed_origin="http://localhost:3000",
-                  jwt_secret: str = ""):
+                  jwt_secret: str = "",
+                  smtp_host: str = "",
+                  smtp_port: int = 587,
+                  smtp_user: str = "",
+                  smtp_password: str = "",
+                  smtp_from: str = ""):
     """
     Inject shared server state so REST handlers use the same objects as the
     FIX handlers.  Call this once from server.py before starting the IOLoop.
 
-    jwt_secret  — HMAC-SHA256 key for signing JWTs.  Pass the value of the
-                   JWT_SECRET environment variable (or a strong random fallback).
+    jwt_secret   — HMAC-SHA256 key for signing JWTs.  Pass the value of the
+                    JWT_SECRET environment variable (or a strong random fallback).
+    smtp_*       — SMTP credentials for sending verification emails.
+                    If smtp_host is empty, emails are logged instead of sent.
     """
     global _cursor, _conn, _user_manager, _product_manager
     global _products, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _ALLOWED_EMAIL_DOMAINS
     global _TRADING_SESSION, _QUOTE_SESSION
     global _WebSocketHandler, _CORS_ORIGIN, _JWT_SECRET
+    global _SMTP_HOST, _SMTP_PORT, _SMTP_USER, _SMTP_PASSWORD, _SMTP_FROM, _SMTP_ENABLED
     _cursor = cursor
     _conn = conn
     _user_manager = user_manager
@@ -108,6 +130,12 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _WebSocketHandler = websocket_handler
     _CORS_ORIGIN = allowed_origin
     _JWT_SECRET = jwt_secret or secrets.token_hex(32)
+    _SMTP_HOST = smtp_host
+    _SMTP_PORT = smtp_port
+    _SMTP_USER = smtp_user
+    _SMTP_PASSWORD = smtp_password
+    _SMTP_FROM = smtp_from or smtp_user
+    _SMTP_ENABLED = bool(smtp_host)
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +282,83 @@ def _revoke_all_refresh_tokens(email: str):
         "UPDATE refresh_tokens SET revoked=1 WHERE email=?", (email,)
     )
     _conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Email verification helpers
+# ---------------------------------------------------------------------------
+
+def _create_verification_token(email: str) -> str:
+    """
+    Generates a one-time email verification token, stores it in the DB,
+    and returns the token string.  Any previously unused tokens for this
+    email are marked as used so only the latest link is valid.
+    """
+    # Invalidate old tokens for this email
+    _cursor.execute(
+        "UPDATE email_verifications SET used=1 WHERE email=? AND used=0", (email,)
+    )
+    token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + _EMAIL_VERIFICATION_TTL
+    _cursor.execute(
+        "INSERT INTO email_verifications (token, email, expires_at, used) VALUES (?, ?, ?, 0)",
+        (token, email, expires_at),
+    )
+    _conn.commit()
+    return token
+
+
+def _send_verification_email(email: str, token: str):
+    """
+    Sends a verification email with a confirmation link.
+    If SMTP is not configured, logs the link instead (useful for development).
+    """
+    verify_url = f"{_CORS_ORIGIN}/verify-email?token={token}"
+
+    if not _SMTP_ENABLED:
+        logging.info(
+            "SMTP not configured — skipping email send. "
+            "Verification link for %s: %s", email, verify_url
+        )
+        return
+
+    subject = "Ověření emailové adresy / Email address verification"
+    body_html = f"""
+<html><body>
+<p>Dobrý den,</p>
+<p>Pro dokončení registrace potvrďte svoji emailovou adresu kliknutím na odkaz níže:</p>
+<p><a href="{verify_url}">{verify_url}</a></p>
+<p>Odkaz je platný 24 hodin.</p>
+<hr>
+<p>Hello,</p>
+<p>To complete your registration, please verify your email address by clicking the link below:</p>
+<p><a href="{verify_url}">{verify_url}</a></p>
+<p>The link is valid for 24 hours.</p>
+</body></html>
+"""
+    body_plain = (
+        f"Ověřte svůj email: {verify_url}\n\n"
+        f"Verify your email: {verify_url}"
+    )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = _SMTP_FROM
+    msg["To"] = email
+    msg.attach(MIMEText(body_plain, "plain", "utf-8"))
+    msg.attach(MIMEText(body_html, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(_SMTP_USER, _SMTP_PASSWORD)
+            server.sendmail(_SMTP_FROM, [email], msg.as_string())
+        logging.info("Verification email sent to %s", email)
+    except Exception as exc:
+        logging.error("Failed to send verification email to %s: %s", email, exc)
+        raise
+
 
 def _get_trading_id(email: str):
     """
@@ -428,17 +533,42 @@ class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
         if password != confirm:
             return _json_error(self, 400, "Passwords do not match")
 
-        _cursor.execute("SELECT id FROM users WHERE email=?", (email,))
-        if _cursor.fetchone():
+        _cursor.execute("SELECT id, email_verified FROM users WHERE email=?", (email,))
+        existing = _cursor.fetchone()
+        if existing:
+            existing_id, verified = existing
+            if not verified:
+                # Account exists but not verified — resend verification email
+                token = _create_verification_token(email)
+                try:
+                    _send_verification_email(email, token)
+                except Exception:
+                    pass  # already logged inside _send_verification_email
+                return _json_error(
+                    self, 409,
+                    "Email already registered but not verified. "
+                    "A new verification email has been sent."
+                )
             return _json_error(self, 409, "Email already registered")
 
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         _cursor.execute(
-            "INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed)
+            "INSERT INTO users (email, password, email_verified) VALUES (?, ?, 0)",
+            (email, hashed),
         )
         _conn.commit()
 
-        _json_ok(self, {"message": "Registration successful"}, status=201)
+        token = _create_verification_token(email)
+        try:
+            _send_verification_email(email, token)
+        except Exception:
+            pass  # already logged inside _send_verification_email
+
+        _json_ok(
+            self,
+            {"message": "Registration successful. Please check your email to verify your account."},
+            status=201,
+        )
 
 
 class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
@@ -456,12 +586,14 @@ class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
         if not email or not password:
             return _json_error(self, 400, "Email and password are required")
 
-        _cursor.execute("SELECT password FROM users WHERE email=?", (email,))
+        _cursor.execute(
+            "SELECT password, role, email_verified FROM users WHERE email=?", (email,)
+        )
         row = _cursor.fetchone()
         if row is None:
             return _json_error(self, 401, "Invalid email or password")
 
-        stored_hash = row[0]
+        stored_hash, role, email_verified = row
         try:
             match = bcrypt.checkpw(password.encode(), stored_hash.encode())
         except Exception:
@@ -469,6 +601,13 @@ class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
 
         if not match:
             return _json_error(self, 401, "Invalid email or password")
+
+        # Human users must verify their email before logging in
+        if role == "user" and not email_verified:
+            return _json_error(
+                self, 403,
+                "Email not verified. Please check your inbox and click the verification link."
+            )
 
         # Revoke ALL existing refresh tokens for this email
         _revoke_all_refresh_tokens(email)
@@ -540,6 +679,77 @@ class AuthLogoutHandler(CORSMixin, tornado.web.RequestHandler):
             _revoke_refresh_token(token)
         self.clear_cookie("refresh_token", path="/api/auth")
         _json_ok(self, {"message": "Logged out"})
+
+
+class AuthVerifyEmailHandler(CORSMixin, tornado.web.RequestHandler):
+    """GET /api/auth/verify-email?token=...  — confirms a user's email address"""
+
+    def get(self):
+        token = self.get_argument("token", "").strip()
+        if not token:
+            return _json_error(self, 400, "Missing token")
+
+        now = int(time.time())
+        _cursor.execute(
+            "SELECT email, expires_at, used FROM email_verifications WHERE token=?", (token,)
+        )
+        row = _cursor.fetchone()
+        if row is None:
+            return _json_error(self, 400, "Invalid verification token")
+
+        email, expires_at, used = row
+        if used:
+            return _json_error(self, 400, "Verification token has already been used")
+        if expires_at < now:
+            return _json_error(self, 400, "Verification token has expired")
+
+        # Mark token as used and activate the account
+        _cursor.execute(
+            "UPDATE email_verifications SET used=1 WHERE token=?", (token,)
+        )
+        _cursor.execute(
+            "UPDATE users SET email_verified=1 WHERE email=?", (email,)
+        )
+        _conn.commit()
+
+        logging.info("Email verified for %s", email)
+        _json_ok(self, {"message": "Email verified successfully. You can now log in."})
+
+
+class AuthResendVerificationHandler(CORSMixin, tornado.web.RequestHandler):
+    """POST /api/auth/resend-verification  — { email } resends the verification email"""
+
+    def post(self):
+        try:
+            body = json.loads(self.request.body)
+        except json.JSONDecodeError:
+            return _json_error(self, 400, "Invalid JSON")
+
+        email = body.get("email", "").strip()
+        if not email:
+            return _json_error(self, 400, "Email is required")
+
+        _cursor.execute(
+            "SELECT email_verified, role FROM users WHERE email=?", (email,)
+        )
+        row = _cursor.fetchone()
+        # Always return 200 to avoid leaking which emails are registered
+        if not row or row[0] or row[1] != "user":
+            return _json_ok(
+                self,
+                {"message": "If your email is registered and unverified, a new link has been sent."},
+            )
+
+        token = _create_verification_token(email)
+        try:
+            _send_verification_email(email, token)
+        except Exception:
+            pass  # already logged inside _send_verification_email
+
+        _json_ok(
+            self,
+            {"message": "If your email is registered and unverified, a new link has been sent."},
+        )
 
 
 class AuthMeHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
@@ -1120,11 +1330,13 @@ REST_ROUTES = [
     # Public config
     (r"/api/config",        PublicConfigHandler),
     # Auth
-    (r"/api/auth/register", AuthRegisterHandler),
-    (r"/api/auth/login",    AuthLoginHandler),
-    (r"/api/auth/refresh",  AuthRefreshHandler),
-    (r"/api/auth/logout",   AuthLogoutHandler),
-    (r"/api/auth/me",       AuthMeHandler),
+    (r"/api/auth/register",              AuthRegisterHandler),
+    (r"/api/auth/login",                 AuthLoginHandler),
+    (r"/api/auth/refresh",               AuthRefreshHandler),
+    (r"/api/auth/logout",                AuthLogoutHandler),
+    (r"/api/auth/me",                    AuthMeHandler),
+    (r"/api/auth/verify-email",          AuthVerifyEmailHandler),
+    (r"/api/auth/resend-verification",   AuthResendVerificationHandler),
     # Market (public)
     (r"/api/market/products",  MarketProductsHandler),
     (r"/api/market/orderbook", MarketOrderBookHandler),
