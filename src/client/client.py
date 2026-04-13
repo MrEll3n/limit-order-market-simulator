@@ -120,8 +120,17 @@ class Trader (Subscriber, ABC):
         :param config: Configuration dictionary with server details, e.g. HOST, PORT, TRADING_SESSION, QUOTE_SESSION
         """
         self.PROTOCOL = FIXProtocol(sender, target)
-        super().__init__(f"ws://{config['HOST'].replace('http://', '')}:{config['PORT']}/websocket", self.PROTOCOL)
-        self.BASE_URL = f"{config['HOST']}:{config['PORT']}"
+        host = config['HOST']
+        port = config.get('PORT')
+        ws_scheme = "wss" if host.startswith("https") else "ws"
+        host_stripped = host.replace('https://', '').replace('http://', '')
+        if port:
+            ws_url = f"{ws_scheme}://{host_stripped}:{port}/websocket"
+            self.BASE_URL = f"{host}:{port}"
+        else:
+            ws_url = f"{ws_scheme}://{host_stripped}/websocket"
+            self.BASE_URL = host
+        super().__init__(ws_url, self.PROTOCOL)
         self.TRADING_SESSION = config["TRADING_SESSION"]
         self.QUOTE_SESSION = config["QUOTE_SESSION"]
 
@@ -133,7 +142,14 @@ class Trader (Subscriber, ABC):
         :return: JSON with response data if successful, None otherwise
         """
         caller = inspect.stack()[1].function
-        response = response.json()
+        if not response.content:
+            print(f"\033[91mError in {caller}: empty response (status {response.status_code})\033[0m")
+            return None
+        try:
+            response = response.json()
+        except Exception:
+            print(f"\033[91mError in {caller}: invalid JSON response (status {response.status_code})\033[0m")
+            return None
         if "error" in response:
             print(f"\033[91mError in {caller}: {response['error']}\033[0m")  # Print in red
             return None

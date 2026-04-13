@@ -1,7 +1,8 @@
 import sys
+import os
 import requests
 
-sys.path.append('../../..')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.algorithmic_trader import AlgorithmicTrader
 

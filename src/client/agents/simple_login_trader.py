@@ -1,13 +1,14 @@
 import sys
+import os
 import requests
 
-sys.path.append('../../..')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.algorithmic_trader import AlgorithmicTrader
 
 
 class SimpleLoginTrader(AlgorithmicTrader):
-    def __init__(self, name, server, config, product="product1", buy_below=99, sell_above=101):
+    def __init__(self, name, server, config, product="product1", buy_below=105, sell_above=90):
         """
         :param product:    Produkt, se kterým agent obchoduje
         :param buy_below:  Koupí, když je cena pod touto hranicí
@@ -41,17 +42,15 @@ class SimpleLoginTrader(AlgorithmicTrader):
 
 
 if __name__ == "__main__":
-    HOST = "http://127.0.0.1"
-    PORT = 8888
+    HOST = "https://honicoin.site"
 
-    config = requests.get(f"{HOST}:{PORT}/api/config").json()
+    config = requests.get(f"{HOST}/api/config").json()
     config["HOST"] = HOST
-    config["PORT"] = PORT
 
-    trader = SimpleLoginTrader("trader", "server", config)
+    trader = SimpleLoginTrader("BOTname", "server", config)
 
     # Option A: authenticate with email + password (generates a new API key)
-    trader.login_via_credentials("your@students.zcu.cz", "your_password")
+    trader.login_via_credentials("bot@example.com", "password :D")
 
     # Option B: authenticate with a saved API key (reuses existing key)
     # trader.login_via_apikey("sk-your-api-key")
