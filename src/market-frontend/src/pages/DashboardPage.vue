@@ -49,7 +49,7 @@ type WsEnvelope = {
 
 type MarketReportResponse = {
     product: string;
-    history: string[];
+    history: OrderBookSnapshot[];
 };
 
 // FIX protocol parser
@@ -280,7 +280,7 @@ const fetchChartHistory = async (product: string, historyLength: number = -1) =>
         if (!res.ok) return;
         const { history } = (await res.json()) as MarketReportResponse;
 
-        rawHistory.value = history.map(s => JSON.parse(s) as OrderBookSnapshot);
+        rawHistory.value = history;
     } catch {
         // server not ready yet
     } finally {
