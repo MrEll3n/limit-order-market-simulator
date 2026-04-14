@@ -419,18 +419,18 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="h-screen flex flex-col overflow-hidden gap-3 pb-3">
+    <div class="min-h-screen flex flex-col gap-3 pb-3 lg:h-screen lg:overflow-hidden">
         <TopBar class="mx-3 mt-3" />
         <!-- Main View -->
-        <div class="flex-1 flex flex-row overflow-hidden gap-3 mx-3">
-            <div class="w-3/12 flex flex-col overflow-y-auto">
+        <div class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden gap-3 mx-3">
+            <div class="w-full lg:w-3/12 flex flex-col lg:overflow-y-auto">
                 <!-- Active Orders -->
-                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset h-9/12 grow">
+                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset lg:grow min-h-64 lg:min-h-0">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" :plugins="[orderMidPricePlugin]" class="h-full w-full" />
                 </Fieldset>
                 <!-- Trading Details -->
-                <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="h-3/12 grow">
+                <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="lg:grow shrink-0">
                     <div class="flex flex-col gap-1 text-sm">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.midPrice') }}</span>
@@ -448,7 +448,7 @@ onMounted(async () => {
                 </Fieldset>
             </div>
 
-            <div class="w-6/12 flex flex-col overflow-y-auto">
+            <div class="w-full lg:w-6/12 flex flex-col lg:overflow-y-auto">
                 <!-- Price Chart -->
                 <Fieldset :legend="tDashboardPage('panels.priceChart')">
                     <Skeleton v-if="!pageReady" width="100%" height="18.5rem" />
@@ -465,7 +465,7 @@ onMounted(async () => {
                     <Chart v-else type="bar" :data="obHistogramData" :options="obHistogramOptions" :plugins="[obMidPricePlugin]" class="h-full w-full" />
                 </Fieldset> -->
                 <!-- Order History -->
-                <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="grow overflow-hidden">
+                <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="lg:grow overflow-hidden min-h-48 lg:min-h-0">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <div v-else class="flex flex-col h-full text-xs overflow-hidden">
                         <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
@@ -489,7 +489,7 @@ onMounted(async () => {
                 </Fieldset>
             </div>
 
-            <div class="w-3/12 flex flex-col overflow-hidden gap-3">
+            <div class="w-full lg:w-3/12 flex flex-col lg:overflow-hidden gap-3">
                 <!-- Owned -->
                 <Fieldset :legend="tDashboardPage('panels.ownedStocks')" class="shrink-0">
                     <div class="flex flex-col gap-1 text-sm">
@@ -565,7 +565,7 @@ onMounted(async () => {
                     </div>
                 </Fieldset>
                 <!-- Active Orders -->
-                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="grow overflow-hidden active-orders-right-fieldset">
+                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="lg:grow overflow-hidden active-orders-right-fieldset min-h-48 lg:min-h-0">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <div v-else class="flex flex-col h-full text-xs overflow-hidden">
                         <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
