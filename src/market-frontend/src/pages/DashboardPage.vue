@@ -425,7 +425,7 @@ onMounted(async () => {
         <div class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden gap-3 mx-3">
             <div class="w-full lg:w-3/12 flex flex-col lg:overflow-y-auto">
                 <!-- Active Orders -->
-                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset lg:grow min-h-64 lg:min-h-0">
+                <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset lg:grow min-h-64 lg:min-h-0 overflow-hidden">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" :plugins="[orderMidPricePlugin]" class="h-full w-full" />
                 </Fieldset>
@@ -610,6 +610,8 @@ onMounted(async () => {
 .active-orders-fieldset .p-fieldset-content-wrapper,
 .active-orders-fieldset .p-fieldset-content {
     height: 100%;
+    overflow: hidden;
+    min-width: 0;
 }
 
 .active-orders-right-fieldset .p-fieldset-content-container,
