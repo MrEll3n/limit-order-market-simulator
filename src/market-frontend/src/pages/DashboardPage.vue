@@ -166,8 +166,10 @@ const plotFromHistory = (snapshots: OrderBookSnapshot[]) => {
 };
 
 watch(chartZoomSelect, () => plotFromHistory(rawHistory.value));
+
+let mountComplete = false;
 watch(selectedProduct, async (product) => {
-    if (!product) return;
+    if (!product || !mountComplete) return;
     loadingChart.value = true;
     rawHistory.value = [];
     plotInitialized = false;
@@ -270,7 +272,11 @@ watch(wsData, (raw) => {
 const fetchChartHistory = async (product: string, historyLength: number = -1) => {
     loadingChart.value = true;
     try {
-        const res = await fetch(`/api/market/report?product=${product}&history_len=${historyLength}`);
+        const authData = getAuthData();
+        if (!authData?.accessToken) { clearAuthAndRedirect(); return; }
+        const res = await fetch(`/api/market/report?product=${product}&history_len=${historyLength}`, {
+            headers: { Authorization: `Bearer ${authData.accessToken}` },
+        });
         if (!res.ok) return;
         const { history } = (await res.json()) as MarketReportResponse;
 
@@ -407,6 +413,7 @@ onMounted(async () => {
     ]);
     wsOpen();
     await fetchChartHistory(selectedProduct.value);
+    mountComplete = true;
 });
 
 </script>
