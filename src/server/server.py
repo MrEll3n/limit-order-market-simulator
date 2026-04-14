@@ -89,6 +89,87 @@ def _validate_env():
 
 _validate_env()
 
+
+def _validate_config(cfg: dict):
+    errors = []
+
+    # Required top-level keys and their expected types
+    required = {
+        "TRADING_SESSION": str,
+        "QUOTE_SESSION":   str,
+        "PRODUCTS":        list,
+        "FIXED_FEE":       (int, float),
+        "PERCENTAGE_FEE":  (int, float),
+        "INITIAL_BUDGET":  (int, float),
+    }
+    for key, expected in required.items():
+        if key not in cfg:
+            errors.append(f"config: missing required key '{key}'")
+        elif not isinstance(cfg[key], expected):
+            errors.append(f"config: '{key}' must be {expected}, got {type(cfg[key]).__name__}")
+
+    # String fields must be non-empty
+    for key in ("TRADING_SESSION", "QUOTE_SESSION"):
+        if isinstance(cfg.get(key), str) and not cfg[key].strip():
+            errors.append(f"config: '{key}' must not be empty")
+
+    # Numeric fields must be non-negative
+    for key in ("FIXED_FEE", "PERCENTAGE_FEE"):
+        val = cfg.get(key)
+        if isinstance(val, (int, float)) and val < 0:
+            errors.append(f"config: '{key}' must be >= 0, got {val}")
+
+    if isinstance(cfg.get("INITIAL_BUDGET"), (int, float)) and cfg["INITIAL_BUDGET"] <= 0:
+        errors.append(f"config: 'INITIAL_BUDGET' must be > 0, got {cfg['INITIAL_BUDGET']}")
+
+    # PRODUCTS must be a non-empty list of single-key dicts
+    products_raw = cfg.get("PRODUCTS", [])
+    if isinstance(products_raw, list):
+        if len(products_raw) == 0:
+            errors.append("config: 'PRODUCTS' must not be empty")
+
+        seen_names = set()
+        for i, item in enumerate(products_raw):
+            prefix = f"config: PRODUCTS[{i}]"
+            if not isinstance(item, dict) or len(item) != 1:
+                errors.append(f"{prefix} must be a single-key object {{name: settings}}")
+                continue
+
+            name, settings = next(iter(item.items()))
+            if not isinstance(name, str) or not name.strip():
+                errors.append(f"{prefix}: product name must be a non-empty string")
+            elif name in seen_names:
+                errors.append(f"{prefix}: duplicate product name '{name}'")
+            else:
+                seen_names.add(name)
+
+            if not isinstance(settings, dict):
+                errors.append(f"{prefix} '{name}': settings must be an object")
+                continue
+
+            # Validate per-product numeric settings
+            numeric_settings = ("INITIAL_PRICE", "MAX_BUY", "MIN_BUY", "MAX_SELL", "MIN_SELL")
+            for field in numeric_settings:
+                val = settings.get(field)
+                if val is not None:
+                    if not isinstance(val, (int, float)) or val <= 0:
+                        errors.append(f"{prefix} '{name}': '{field}' must be a positive number, got {val!r}")
+
+            # MIN must be less than MAX when both are set
+            for side in ("BUY", "SELL"):
+                min_val = settings.get(f"MIN_{side}")
+                max_val = settings.get(f"MAX_{side}")
+                if min_val and max_val and min_val >= max_val:
+                    errors.append(
+                        f"{prefix} '{name}': MIN_{side} ({min_val}) must be < MAX_{side} ({max_val})"
+                    )
+
+    if errors:
+        for msg in errors:
+            print(f"ERROR: {msg}")
+        sys.exit(1)
+
+
 colorlog_handler = logging.StreamHandler()
 colorlog_handler.setFormatter(
     colorlog.ColoredFormatter(
@@ -112,11 +193,19 @@ DATA_DIR = ROOT_DIR / "data"
 
 with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
     config = json.load(config_file)
+_validate_config(config)
 MSG_SEQ_NUM = 0
 ID = 0
 
 # Initialize order books and matching engines for multiple products
-products = config["PRODUCTS"]
+# PRODUCTS is a list of {name: {settings}} objects; extract names and per-product settings.
+products_raw = config["PRODUCTS"]
+products = []
+product_settings = {}
+for _item in products_raw:
+    for _name, _settings in _item.items():
+        products.append(_name)
+        product_settings[_name] = _settings
 
 fixed_fee = config["FIXED_FEE"]
 percentage_fee = config["PERCENTAGE_FEE"]
@@ -372,6 +461,33 @@ class TradingHandler(MsgHandler):
             return protocol.encode(
                 {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
             )
+
+        # Enforce per-product price limits (0 means no limit)
+        settings = product_settings.get(product, {})
+        order_price = message["order"]["price"]
+        order_side = message["order"]["side"]
+        if order_side == "buy":
+            max_buy = settings.get("MAX_BUY", 0)
+            min_buy = settings.get("MIN_BUY", 0)
+            if max_buy > 0 and order_price > max_buy:
+                return protocol.encode(
+                    {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+                )
+            if min_buy > 0 and order_price < min_buy:
+                return protocol.encode(
+                    {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+                )
+        else:
+            max_sell = settings.get("MAX_SELL", 0)
+            min_sell = settings.get("MIN_SELL", 0)
+            if max_sell > 0 and order_price > max_sell:
+                return protocol.encode(
+                    {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+                )
+            if min_sell > 0 and order_price < min_sell:
+                return protocol.encode(
+                    {"order_id": -1, "status": False, "msg_type": "ExecutionReport"}
+                )
 
         # If the order is a buy order, check if the user has enough budget to place the order
         if message["order"]["side"] == "buy":
@@ -768,6 +884,7 @@ def make_app():
         user_manager=user_manager,
         product_manager=product_manager,
         products=products,
+        product_settings=product_settings,
         initial_budget=INITIAL_BUDGET,
         fixed_fee=fixed_fee,
         percentage_fee=percentage_fee,

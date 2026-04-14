@@ -61,6 +61,7 @@ _conn = None
 _user_manager = None
 _product_manager = None
 _products = []
+_product_settings: dict = {}
 _INITIAL_BUDGET = None
 _FIXED_FEE = None
 _PERCENTAGE_FEE = None
@@ -77,6 +78,7 @@ _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
 
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
+                  product_settings,
                   initial_budget, fixed_fee, percentage_fee,
                   allowed_email_domains,
                   trading_session, quote_session,
@@ -91,7 +93,7 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
                    JWT_SECRET environment variable (or a strong random fallback).
     """
     global _cursor, _conn, _user_manager, _product_manager
-    global _products, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _ALLOWED_EMAIL_DOMAINS
+    global _products, _product_settings, _INITIAL_BUDGET, _FIXED_FEE, _PERCENTAGE_FEE, _ALLOWED_EMAIL_DOMAINS
     global _TRADING_SESSION, _QUOTE_SESSION
     global _WebSocketHandler, _CORS_ORIGIN, _JWT_SECRET
     _cursor = cursor
@@ -99,6 +101,7 @@ def init_rest_api(cursor, conn, user_manager, product_manager, products,
     _user_manager = user_manager
     _product_manager = product_manager
     _products = products
+    _product_settings = product_settings
     _INITIAL_BUDGET = initial_budget
     _FIXED_FEE = fixed_fee
     _PERCENTAGE_FEE = percentage_fee
@@ -401,9 +404,13 @@ class PublicConfigHandler(CORSMixin, tornado.web.RequestHandler):
     def get(self):
         _json_ok(self, {
             "allowedEmailDomains": _ALLOWED_EMAIL_DOMAINS,
-            "PRODUCTS":        _products,
-            "TRADING_SESSION": _TRADING_SESSION,
-            "QUOTE_SESSION":   _QUOTE_SESSION,
+            "PRODUCTS":            _products,
+            "PRODUCT_SETTINGS":    _product_settings,
+            "TRADING_SESSION":     _TRADING_SESSION,
+            "QUOTE_SESSION":       _QUOTE_SESSION,
+            "INITIAL_BUDGET":      _INITIAL_BUDGET,
+            "FIXED_FEE":           _FIXED_FEE,
+            "PERCENTAGE_FEE":      _PERCENTAGE_FEE,
         })
 
 
@@ -659,7 +666,7 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
             return _json_error(self, 400, "side must be 'buy' or 'sell'")
         try:
             quantity = int(quantity)
-            price = float(price)
+            price = round(float(price), 2)
         except (TypeError, ValueError):
             return _json_error(self, 400, "quantity (int) and price (float) are required")
         if quantity <= 0 or price <= 0:
@@ -668,6 +675,23 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         max_int = 2 ** 31 - 1
         if quantity > max_int or price > max_int:
             return _json_error(self, 400, "quantity or price exceeds maximum value")
+
+        # Enforce per-product price limits (0 means no limit)
+        settings = _product_settings.get(product, {})
+        if side == "buy":
+            max_buy = settings.get("MAX_BUY", 0)
+            min_buy = settings.get("MIN_BUY", 0)
+            if max_buy > 0 and price > max_buy:
+                return _json_error(self, 422, f"Buy price {price} exceeds MAX_BUY {max_buy}")
+            if min_buy > 0 and price < min_buy:
+                return _json_error(self, 422, f"Buy price {price} is below MIN_BUY {min_buy}")
+        else:
+            max_sell = settings.get("MAX_SELL", 0)
+            min_sell = settings.get("MIN_SELL", 0)
+            if max_sell > 0 and price > max_sell:
+                return _json_error(self, 422, f"Sell price {price} exceeds MAX_SELL {max_sell}")
+            if min_sell > 0 and price < min_sell:
+                return _json_error(self, 422, f"Sell price {price} is below MIN_SELL {min_sell}")
 
         # Budget/volume checks
         if side == "buy":

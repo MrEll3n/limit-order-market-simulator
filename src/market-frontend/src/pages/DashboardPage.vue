@@ -22,7 +22,7 @@ const { clearAuthAndRedirect, getAuthData, refreshAccessToken } = useAuth();
 
 // Stores
 const marketStore = useMarketStore();
-const { products, selectedProduct } = storeToRefs(marketStore);
+const { products, selectedProduct, productSettings } = storeToRefs(marketStore);
 
 const accountStore = useAccountStore();
 const { orders, balance, orderHistory } = storeToRefs(accountStore);
@@ -295,9 +295,28 @@ const orderSideOpts = computed(() => [
     { name: tDashboardPage('tradingPanel.sell'), value: 'sell' },
 ]);
 
+const currentProductSettings = computed(() =>
+    productSettings.value[selectedProduct.value] ?? {}
+);
+
+const priceMin = computed<number | undefined>(() => {
+    const limit = orderSide.value === 'buy'
+        ? currentProductSettings.value.MIN_BUY
+        : currentProductSettings.value.MIN_SELL;
+    return limit > 0 ? limit : undefined;
+});
+
+const priceMax = computed<number | undefined>(() => {
+    const limit = orderSide.value === 'buy'
+        ? currentProductSettings.value.MAX_BUY
+        : currentProductSettings.value.MAX_SELL;
+    return limit > 0 ? limit : undefined;
+});
+
 watch(midPrice, (val) => {
     if (val !== null && orderPrice.value === null) orderPrice.value = val;
 }, { immediate: true });
+
 
 const cancellingId = ref<string | null>(null);
 

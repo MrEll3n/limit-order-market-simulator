@@ -1,9 +1,18 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
+interface ProductLimits {
+    INITIAL_PRICE?: number;
+    MAX_BUY?: number;
+    MIN_BUY?: number;
+    MAX_SELL?: number;
+    MIN_SELL?: number;
+}
+
 export const useMarketStore = defineStore('market', () => {
     const products = ref<string[]>([]);
     const selectedProduct = ref<string>('');
+    const productSettings = ref<Record<string, ProductLimits>>({});
     const loading = ref(false);
     const error = ref<string | null>(null);
 
@@ -25,5 +34,14 @@ export const useMarketStore = defineStore('market', () => {
         }
     }
 
-    return { products, selectedProduct, loading, error, fetchProducts };
+    async function fetchProductSettings() {
+        try {
+            const res = await fetch('/api/config');
+            if (!res.ok) return;
+            const data = await res.json() as { PRODUCT_SETTINGS?: Record<string, ProductLimits> };
+            if (data.PRODUCT_SETTINGS) productSettings.value = data.PRODUCT_SETTINGS;
+        } catch { /* non-critical, ignore */ }
+    }
+
+    return { products, selectedProduct, productSettings, loading, error, fetchProducts, fetchProductSettings };
 });

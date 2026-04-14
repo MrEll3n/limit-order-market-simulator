@@ -18,5 +18,17 @@ docs {
   **Auth** — none
 
   **Responses**
-  - `200` — `{ allowedEmailDomains, PRODUCTS, TRADING_SESSION, QUOTE_SESSION }`
+  - `200` — `{ allowedEmailDomains, PRODUCTS, PRODUCT_SETTINGS, TRADING_SESSION, QUOTE_SESSION, INITIAL_BUDGET, FIXED_FEE, PERCENTAGE_FEE }`
+
+  **Fields**
+  | Field               | Type    | Description                                      |
+  |---------------------|---------|--------------------------------------------------|
+  | allowedEmailDomains | array   | Domains allowed for registration                 |
+  | PRODUCTS            | array   | List of tradeable product names                  |
+  | PRODUCT_SETTINGS    | object  | Per-product price limits (MAX_BUY/MIN_BUY/…)     |
+  | TRADING_SESSION     | string  | FIX trading session path                         |
+  | QUOTE_SESSION       | string  | FIX quote session path                           |
+  | INITIAL_BUDGET      | number  | Starting budget for new user accounts            |
+  | FIXED_FEE           | number  | Fixed fee per order                              |
+  | PERCENTAGE_FEE      | number  | Percentage fee per order                         |
 }

@@ -45,8 +45,11 @@ class MarketMaker(AdminTrader, ABC):
         self.products = config["PRODUCTS"]
         self.initial_emission = {product: initial_emission for product in self.products} \
             if isinstance(initial_emission, int) else initial_emission
-        self.starting_price = {product: starting_price for product in self.products} \
-            if isinstance(starting_price, int) else starting_price
+        product_settings = config.get("PRODUCT_SETTINGS", {})
+        self.starting_price = {
+            product: product_settings.get(product, {}).get("INITIAL_PRICE", starting_price)
+            for product in self.products
+        }
         self.initial_num_orders = {product: initial_num_orders for product in self.products} \
             if isinstance(initial_num_orders, int) else initial_num_orders
 

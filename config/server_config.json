@@ -1,7 +1,26 @@
 {
     "TRADING_SESSION": "trade",
     "QUOTE_SESSION": "quote",
-    "PRODUCTS": ["product1", "product2"],
+    "PRODUCTS": [
+        {
+            "product1": {
+                "INITIAL_PRICE": 100,
+                "MAX_BUY": 2000,
+                "MIN_BUY": 0.01,
+                "MAX_SELL": 2000,
+                "MIN_SELL": 0.01
+            }
+        },
+        {
+            "product2": {
+                "INITIAL_PRICE": 150,
+                "MAX_BUY": 3000,
+                "MIN_BUY": 0.01,
+                "MAX_SELL": 2800,
+                "MIN_SELL": 0.01
+            }
+        }
+    ],
     "FIXED_FEE": 0.01,
     "PERCENTAGE_FEE": 0.0001,
     "INITIAL_BUDGET": 10000
