@@ -76,6 +76,50 @@ _JWT_SECRET: str = ""                    # injected by init_rest_api
 _ACCESS_TOKEN_TTL  = 15 * 60            # 15 minutes  (seconds)
 _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
 
+# ---------------------------------------------------------------------------
+# Order rate limiter — sliding window, per user
+# ---------------------------------------------------------------------------
+# Max orders within _RATE_LIMIT_WINDOW seconds, keyed by role.
+# Admins have no limit (None).
+_RATE_LIMIT_WINDOW = 10   # seconds
+_RATE_LIMITS: dict[str, int | None] = {
+    "user":  10,    # human traders: 10 orders / 10 s
+    "bot":   10,    # algorithmic bots: 10 orders / 10 s
+    "admin": None,  # no limit
+}
+
+from collections import deque
+_order_timestamps: dict[str, deque] = {}
+
+
+def _check_order_rate_limit(email: str, role: str) -> bool:
+    """
+    Sliding-window rate limiter.
+    Returns True if the request is within the limit, False if exceeded.
+    Admins (limit=None) are always allowed.
+    """
+    limit = _RATE_LIMITS.get(role)
+    if limit is None:
+        return True
+
+    now = time.time()
+    window_start = now - _RATE_LIMIT_WINDOW
+
+    if email not in _order_timestamps:
+        _order_timestamps[email] = deque()
+
+    timestamps = _order_timestamps[email]
+
+    # Drop timestamps outside the current window
+    while timestamps and timestamps[0] < window_start:
+        timestamps.popleft()
+
+    if len(timestamps) >= limit:
+        return False
+
+    timestamps.append(now)
+    return True
+
 
 def init_rest_api(cursor, conn, user_manager, product_manager, products,
                   product_settings,
@@ -649,6 +693,13 @@ class OrdersHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         email, user_id, role = _require_auth(self)
         if not email:
             return
+
+        if not _check_order_rate_limit(email, role):
+            limit = _RATE_LIMITS.get(role)
+            return _json_error(
+                self, 429,
+                f"Rate limit exceeded: max {limit} orders per {_RATE_LIMIT_WINDOW} seconds",
+            )
 
         try:
             body = json.loads(self.request.body)
