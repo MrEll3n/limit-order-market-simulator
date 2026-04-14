@@ -494,7 +494,7 @@ onMounted(async () => {
                 <Fieldset :legend="tDashboardPage('panels.ownedStocks')" class="shrink-0">
                     <div class="flex flex-col gap-1 text-sm">
                         <template v-if="!pageReady">
-                            <div v-for="i in products.length || 1" :key="i" class="flex justify-between items-center">
+                            <div v-for="i in (products.length || 2)" :key="i" class="flex justify-between items-center">
                                 <Skeleton width="4rem" height="1rem" />
                                 <Skeleton width="3rem" height="2rem" />
                             </div>
