@@ -176,7 +176,7 @@ watch(selectedProduct, async (product) => {
     orderBookStore.clear();
     const authData = getAuthData();
     await Promise.all([
-        authData?.accessToken ? accountStore.fetchOrders(authData.accessToken, product) : Promise.resolve(),
+        authData?.accessToken ? accountStore.fetchOrders(authData.accessToken, product, { silent: true }) : Promise.resolve(),
         authData?.accessToken ? fetchOrderHistory(authData.accessToken, product) : Promise.resolve(),
         orderBookStore.fetchSnapshot(product),
     ]);
@@ -337,8 +337,8 @@ const cancelOrder = async (orderId: string) => {
         });
         if (res.ok) {
             await Promise.all([
-                accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
-                accountStore.fetchBalance(authData.accessToken),
+                accountStore.fetchOrders(authData.accessToken, selectedProduct.value, { silent: true }),
+                accountStore.fetchBalance(authData.accessToken, { silent: true }),
                 fetchOrderHistory(authData.accessToken, selectedProduct.value),
             ]);
         } else {
@@ -375,8 +375,8 @@ const placeOrder = async () => {
             showSuccess({ label: tDashboardPage('tradingPanel.toast.orderPlaced'), detail: `#${data.orderId} — ${data.status}` });
             orderQuantity.value = null;
             await Promise.all([
-                accountStore.fetchOrders(authData.accessToken, selectedProduct.value),
-                accountStore.fetchBalance(authData.accessToken),
+                accountStore.fetchOrders(authData.accessToken, selectedProduct.value, { silent: true }),
+                accountStore.fetchBalance(authData.accessToken, { silent: true }),
                 fetchOrderHistory(authData.accessToken, selectedProduct.value),
             ]);
         }
@@ -518,7 +518,7 @@ onMounted(async () => {
                 </Fieldset>
                 <!-- Trading Panel -->
                 <Fieldset :legend="tDashboardPage('panels.tradingPanel')" class="shrink-0">
-                    <div class="flex flex-col gap-3">
+                    <form class="flex flex-col gap-3" @submit.prevent="placeOrder">
                         <div class="flex flex-col gap-1">
                             <label class="text-xs text-gray-400">{{ tDashboardPage('tradingPanel.product') }}</label>
                             <Skeleton v-if="!pageReady" height="2.25rem" width="100%" />
@@ -555,14 +555,14 @@ onMounted(async () => {
                             />
                         </div>
                         <Button
+                            type="submit"
                             :label="tDashboardPage('tradingPanel.submit')"
                             :severity="orderSide === 'buy' ? 'success' : 'danger'"
                             :loading="submitting"
                             :disabled="!pageReady || !orderPrice || !orderQuantity"
-                            @click="placeOrder"
                             fluid
                         />
-                    </div>
+                    </form>
                 </Fieldset>
                 <!-- Active Orders -->
                 <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="lg:grow overflow-hidden active-orders-right-fieldset min-h-48 lg:min-h-0">

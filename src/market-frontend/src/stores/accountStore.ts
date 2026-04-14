@@ -30,8 +30,8 @@ export const useAccountStore = defineStore('account', () => {
         }
     }
 
-    async function fetchBalance(accessToken: string) {
-        loadingBalance.value = true;
+    async function fetchBalance(accessToken: string, { silent = false } = {}) {
+        if (!silent) loadingBalance.value = true;
         error.value = null;
         try {
             const res = await fetch('/api/account/balance', {
@@ -42,12 +42,12 @@ export const useAccountStore = defineStore('account', () => {
         } catch (e) {
             error.value = e instanceof Error ? e.message : 'Failed to fetch balance';
         } finally {
-            loadingBalance.value = false;
+            if (!silent) loadingBalance.value = false;
         }
     }
 
-    async function fetchOrders(accessToken: string, product: string) {
-        loadingOrders.value = true;
+    async function fetchOrders(accessToken: string, product: string, { silent = false } = {}) {
+        if (!silent) loadingOrders.value = true;
         error.value = null;
         try {
             const res = await fetch(`/api/account/orders?product=${product}`, {
@@ -59,7 +59,7 @@ export const useAccountStore = defineStore('account', () => {
         } catch (e) {
             error.value = e instanceof Error ? e.message : 'Failed to fetch orders';
         } finally {
-            loadingOrders.value = false;
+            if (!silent) loadingOrders.value = false;
         }
     }
 
