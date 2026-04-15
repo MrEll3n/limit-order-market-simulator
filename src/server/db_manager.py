@@ -93,7 +93,9 @@ def create_user_db(db_path='market.db'):
     # Insert initial bot accounts (role = 'bot')
     # Passwords are read from environment variables and stored hashed with bcrypt.
     bot_password           = os.environ.get("BOT_PASSWORD")
+    market_maker_email     = os.environ.get("MARKET_MAKER_EMAIL", "market_maker")
     market_maker_password  = os.environ.get("MARKET_MAKER_PASSWORD")
+    liquidity_gen_email    = os.environ.get("LIQUIDITY_GENERATOR_EMAIL", "liquidity_generator")
     liquidity_gen_password = os.environ.get("LIQUIDITY_GENERATOR_PASSWORD")
 
     _DEFAULT = "changeme"
@@ -113,14 +115,14 @@ def create_user_db(db_path='market.db'):
     liquidity_gen_password = liquidity_gen_password or _DEFAULT
 
     bot_passwords = {
-        'market_maker':       _hash(market_maker_password),
-        'liquidity_generator': _hash(liquidity_gen_password),
+        market_maker_email:  _hash(market_maker_password),
+        liquidity_gen_email: _hash(liquidity_gen_password),
     }
     default_hash = _hash(bot_password)
 
     initial_bots = [
-        'market_maker',
-        'liquidity_generator',
+        market_maker_email,
+        liquidity_gen_email,
         'lstm_trader',
         'momentum_trader_percentage_change',
         'momentum_trader_RSI',
