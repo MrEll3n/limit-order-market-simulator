@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.client import AdminTrader
 
-logging.getLogger("urllib3").setLevel(logging.WARNING)  # Suppress logging
+logging.getLogger("urllib3").setLevel(logging.INFO)  # Suppress logging
 
 
 class SyntheticLiquidityProvider(AdminTrader, ABC):

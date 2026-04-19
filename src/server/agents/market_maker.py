@@ -15,7 +15,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)  # suppress logging
 
 class MarketMaker(AdminTrader, ABC):
     def __init__(self, target, config, bid_ask_spread=0.5, window=10, volatility_multiplier=0.5, initial_emission=500,
-                 starting_price=100, initial_num_orders=10, budget=50000, volume=None):
+                 starting_price=100, initial_num_orders=10, budget=50000, init_budget=0, volume=None):
         """
         Initialize a market maker.
         :param target: Name of the server
@@ -33,7 +33,11 @@ class MarketMaker(AdminTrader, ABC):
         - Available types: fixed number for all products same or dictionary with product specific values
         :param initial_num_orders: Initial number of orders to emit
         - Available types: fixed number for all products same or dictionary with product specific values
-        :param budget: Total budget to allocate for market making (initialization not included)
+        :param budget: Operational budget for ongoing market making after initialization.
+        :param init_budget: Extra budget reserved for the initial liquidity orders in initialize_market().
+        The server is given budget + init_budget up front; init_budget is consumed by the initial
+        buy orders and budget remains available for ongoing operations.
+        Estimate: sum(initial_emission[p] / 2 * starting_price[p] for each product).
         :param volume: Total volume to allocate for market making (initialization not included)
         - Available types: fixed number for all products same or dictionary with product specific values
         """
@@ -62,8 +66,8 @@ class MarketMaker(AdminTrader, ABC):
             print("[MarketMaker] Authentication failed. Exiting.")
             return
         print("[MarketMaker] Authenticated successfully.")
-        self.initialize_liquidity_engine(budget, volume)
-        print(f"[MarketMaker] Initialized. Products: {self.products}, Budget: {budget}, Volume: {volume}")
+        self.initialize_liquidity_engine(budget + init_budget, volume)
+        print(f"[MarketMaker] Initialized. Products: {self.products}, Budget: {budget}, Init budget: {init_budget}, Volume: {volume}")
 
     def receive_market_data(self, data):
         pass
@@ -168,7 +172,9 @@ if __name__ == "__main__":
     config = requests.get(f"{HOST}:{PORT}/api/config").json()
     config["HOST"] = HOST
     config["PORT"] = PORT
+    # init_budget estimate: product1 ~250 shares * 100 = 25 000, product2 ~200 shares * 150 = 30 000
     market_maker = MarketMaker("server", config, volume={"product1": 1000, "product2": 200},
-                               initial_emission={"product1": 500, "product2": 400})
+                               initial_emission={"product1": 500, "product2": 400},
+                               budget=50000, init_budget=60000)
     market_maker.initialize_market()
     market_maker.generate_market_data()

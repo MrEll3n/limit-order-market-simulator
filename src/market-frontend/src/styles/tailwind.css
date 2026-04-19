@@ -93,3 +93,23 @@
 
 /* safelist for elevation="..." props */
 @source inline('elevation-{0,1,2,3,4,5}');
+
+@layer app-overrides {
+    @keyframes skeleton-fade {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.4; }
+    }
+
+    .p-skeleton {
+        animation: skeleton-fade 1.4s ease-in-out infinite;
+    }
+
+    .fade-enter-active,
+    .fade-leave-active {
+        transition: opacity 0.25s ease;
+    }
+    .fade-enter-from,
+    .fade-leave-to {
+        opacity: 0;
+    }
+}

@@ -13,7 +13,7 @@ export const useMarketStore = defineStore('market', () => {
     const products = ref<string[]>([]);
     const selectedProduct = ref<string>('');
     const productSettings = ref<Record<string, ProductLimits>>({});
-    const loading = ref(false);
+    const loading = ref(true);
     const error = ref<string | null>(null);
 
     async function fetchProducts() {

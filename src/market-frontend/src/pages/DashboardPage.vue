@@ -131,6 +131,15 @@ const rawHistory = ref<OrderBookSnapshot[]>([]);
 const loadingChart = ref(true);
 const { pageReady } = usePageReady(loadingChart);
 
+const chartVisible = ref(false);
+watch(pageReady, (ready) => { if (!ready) chartVisible.value = false; });
+watch(chartVisible, async (visible) => {
+    if (visible) {
+        await nextTick();
+        plotFromHistory(rawHistory.value);
+    }
+});
+
 type ChartZoom = 'MINUTE' | 'HOUR' | 'ALL';
 const chartZoomSelect = ref<ChartZoom>('HOUR');
 const chartZoomSelectOpts = computed(() => [
@@ -285,8 +294,6 @@ const fetchChartHistory = async (product: string, historyLength: number = -1) =>
         // server not ready yet
     } finally {
         loadingChart.value = false;
-        await nextTick();
-        plotFromHistory(rawHistory.value);
     }
 };
 
@@ -370,9 +377,12 @@ const placeOrder = async () => {
         });
         const data = await res.json();
         if (!res.ok) {
-            showError({ label: tDashboardPage('tradingPanel.toast.orderFailed'), detail: data.error ?? res.statusText });
+            const statusLabel = data.status ? tDashboardPage(`orderHistory.statuses.${data.status}`) : null;
+            showError({ label: tDashboardPage('tradingPanel.toast.orderFailed'), detail: data.error ?? statusLabel ?? res.statusText });
         } else {
-            showSuccess({ label: tDashboardPage('tradingPanel.toast.orderPlaced'), detail: `#${data.orderId} — ${data.status}` });
+            const detailKey = orderSide.value === 'buy' ? 'tradingPanel.toast.orderDetailBuy' : 'tradingPanel.toast.orderDetailSell';
+            const detail = tDashboardPage(detailKey, { price: orderPrice.value?.toFixed(2) });
+            showSuccess({ label: tDashboardPage('tradingPanel.toast.orderPlaced'), detail });
             orderQuantity.value = null;
             await Promise.all([
                 accountStore.fetchOrders(authData.accessToken, selectedProduct.value, { silent: true }),
@@ -426,23 +436,29 @@ onMounted(async () => {
             <div class="w-full lg:w-3/12 flex flex-col lg:overflow-y-auto">
                 <!-- Active Orders -->
                 <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="active-orders-fieldset lg:grow min-h-64 lg:min-h-0 overflow-hidden">
-                    <Skeleton v-if="!pageReady" style="height: 100%;" />
-                    <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" :plugins="[orderMidPricePlugin]" class="h-full w-full" />
+                    <Transition name="fade" mode="out-in">
+                        <Skeleton v-if="!pageReady" style="height: 100%;" />
+                        <Chart v-else type="bar" :data="orderHistogramData" :options="orderHistogramOptions" :plugins="[orderMidPricePlugin]" class="h-full w-full" />
+                    </Transition>
                 </Fieldset>
                 <!-- Trading Details -->
                 <Fieldset :legend="tDashboardPage('panels.tradingDetails')" class="lg:grow shrink-0">
                     <div class="flex flex-col gap-1 text-sm">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.midPrice') }}</span>
-                            <Skeleton v-if="!pageReady" width="5rem" height="2rem" />
-                            <Message v-else size="small" severity="warn">{{ midPrice?.toFixed(2) ?? '—' }}</Message>
+                            <Transition name="fade" mode="out-in">
+                                <Skeleton v-if="!pageReady" width="5rem" height="2rem" />
+                                <Message v-else size="small" severity="warn">{{ midPrice?.toFixed(2) ?? '—' }}</Message>
+                            </Transition>
                         </div>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-400">{{ tDashboardPage('metrics.imbalance') }}</span>
-                            <Skeleton v-if="!pageReady" width="5rem" height="2rem" />
-                            <Message v-else size="small" :severity="imbalanceIndex !== null && imbalanceIndex > 0 ? 'success' : 'error'">
-                                {{ imbalanceIndex?.toFixed(3) ?? '—' }}
-                            </Message>
+                            <Transition name="fade" mode="out-in">
+                                <Skeleton v-if="!pageReady" width="5rem" height="2rem" />
+                                <Message v-else size="small" :severity="imbalanceIndex !== null && imbalanceIndex > 0 ? 'success' : 'error'">
+                                    {{ imbalanceIndex?.toFixed(3) ?? '—' }}
+                                </Message>
+                            </Transition>
                         </div>
                     </div>
                 </Fieldset>
@@ -451,12 +467,16 @@ onMounted(async () => {
             <div class="w-full lg:w-6/12 flex flex-col lg:overflow-y-auto">
                 <!-- Price Chart -->
                 <Fieldset :legend="tDashboardPage('panels.priceChart')">
-                    <Skeleton v-if="!pageReady" width="100%" height="18.5rem" />
-                    <div v-show="pageReady" ref="plotDiv" class="h-74 w-full" />
+                    <Transition name="fade" @after-leave="chartVisible = true">
+                        <Skeleton v-if="!pageReady" width="100%" height="18.5rem" />
+                    </Transition>
+                    <div v-show="chartVisible" ref="plotDiv" class="h-74 w-full" />
                     <div class="flex flex-row justify-between mt-2">
                         <SelectButton :disabled="!pageReady" v-model="chartZoomSelect" :options="chartZoomSelectOpts" option-label="name" option-value="value" :allow-empty="false" />
-                        <Skeleton v-if="!pageReady" width="10rem" height="2rem" />
-                        <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
+                        <Transition name="fade" mode="out-in">
+                            <Skeleton v-if="!pageReady" width="10rem" height="2rem" />
+                            <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" class="w-full md:w-42" />
+                        </Transition>
                     </div>
                 </Fieldset>
                 <!-- Order Book -->
@@ -466,6 +486,7 @@ onMounted(async () => {
                 </Fieldset> -->
                 <!-- Order History -->
                 <Fieldset :legend="tDashboardPage('panels.orderHistory')" class="lg:grow overflow-hidden min-h-48 lg:min-h-0">
+                    <Transition name="fade" mode="out-in">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <div v-else class="flex flex-col h-full text-xs overflow-hidden">
                         <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
@@ -486,43 +507,46 @@ onMounted(async () => {
                             </div>
                         </div>
                     </div>
+                    </Transition>
                 </Fieldset>
             </div>
 
             <div class="w-full lg:w-3/12 flex flex-col lg:overflow-hidden gap-3">
                 <!-- Owned -->
                 <Fieldset :legend="tDashboardPage('panels.ownedStocks')" class="shrink-0">
-                    <div class="flex flex-col gap-1 text-sm">
-                        <template v-if="!pageReady">
-                            <div v-for="i in (products.length || 2)" :key="i" class="flex justify-between items-center">
-                                <Skeleton width="4rem" height="1rem" />
-                                <Skeleton width="3rem" height="2rem" />
-                            </div>
-                        </template>
-                        <template v-else>
-                            <div
-                                v-for="product in products.filter(p => (balance?.products?.[p]?.postSellVolume ?? 0) > 0)"
-                                :key="product"
-                                class="flex justify-between items-center"
-                            >
-                                <span class="text-gray-400">{{ product }}</span>
-                                <Message size="small" severity="secondary">
-                                    {{ balance?.products?.[product]?.postSellVolume }} {{ tDashboardPage('metrics.shares') }}
-                                </Message>
-                            </div>
-                            <div v-if="!products.some(p => (balance?.products?.[p]?.postSellVolume ?? 0) > 0)" class="text-gray-400 text-xs text-center py-1">
-                                {{ tDashboardPage('metrics.noShares') }}
-                            </div>
-                        </template>
+                    <Transition name="fade" mode="out-in">
+                    <div v-if="!pageReady" class="flex flex-col gap-1 text-sm">
+                        <div v-for="i in (products.length || 2)" :key="i" class="flex justify-between items-center">
+                            <Skeleton width="4rem" height="1rem" />
+                            <Skeleton width="3rem" height="2rem" />
+                        </div>
                     </div>
+                    <div v-else class="flex flex-col gap-1 text-sm">
+                        <div
+                            v-for="product in products.filter(p => (balance?.products?.[p]?.postSellVolume ?? 0) > 0)"
+                            :key="product"
+                            class="flex justify-between items-center"
+                        >
+                            <span class="text-gray-400">{{ product }}</span>
+                            <Message size="small" severity="secondary">
+                                {{ balance?.products?.[product]?.postSellVolume }} {{ tDashboardPage('metrics.shares') }}
+                            </Message>
+                        </div>
+                        <div v-if="!products.some(p => (balance?.products?.[p]?.postSellVolume ?? 0) > 0)" class="text-gray-400 text-xs text-center py-1">
+                            {{ tDashboardPage('metrics.noShares') }}
+                        </div>
+                    </div>
+                    </Transition>
                 </Fieldset>
                 <!-- Trading Panel -->
                 <Fieldset :legend="tDashboardPage('panels.tradingPanel')" class="shrink-0">
                     <form class="flex flex-col gap-3" @submit.prevent="placeOrder">
                         <div class="flex flex-col gap-1">
                             <label class="text-xs text-gray-400">{{ tDashboardPage('tradingPanel.product') }}</label>
-                            <Skeleton v-if="!pageReady" height="2.25rem" width="100%" />
-                            <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" fluid />
+                            <Transition name="fade" mode="out-in">
+                                <Skeleton v-if="!pageReady" height="2.25rem" width="100%" />
+                                <Select v-else v-model="selectedProduct" :options="products" :placeholder="tDashboardPage('chart.selectProduct')" fluid />
+                            </Transition>
                         </div>
                         <SelectButton
                             v-model="orderSide"
@@ -566,6 +590,7 @@ onMounted(async () => {
                 </Fieldset>
                 <!-- Active Orders -->
                 <Fieldset :legend="tDashboardPage('panels.activeOrders')" class="lg:grow overflow-hidden active-orders-right-fieldset min-h-48 lg:min-h-0">
+                    <Transition name="fade" mode="out-in">
                     <Skeleton v-if="!pageReady" style="height: 100%;" />
                     <div v-else class="flex flex-col h-full text-xs overflow-hidden">
                         <div class="flex justify-between text-gray-400 px-2 pb-1 font-medium">
@@ -598,6 +623,7 @@ onMounted(async () => {
                             </div>
                         </div>
                     </div>
+                    </Transition>
                 </Fieldset>
             </div>
             <Toast />

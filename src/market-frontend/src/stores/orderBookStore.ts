@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import type { OrderBookEntry, OrderBookSnapshot } from '@/types';
 
 export const useOrderBookStore = defineStore('orderBook', () => {
-    const loading = ref(false);
+    const loading = ref(true);
     const error = ref(false);
 
     const bids = ref<OrderBookEntry[]>([]);
@@ -66,8 +66,9 @@ export const useOrderBookStore = defineStore('orderBook', () => {
             applySnapshot(snapshot);
         } catch {
             error.value = true;
+        } finally {
+            loading.value = false;
         }
-        loading.value = false;
     }
 
     function clear() {
