@@ -47,17 +47,19 @@ const togglePopover = (event: MouseEvent) => {
         </template>
         <template #end>
             <div class="flex flex-row gap-4 justify-center items-center">
-                <Skeleton v-if="!pageReady" width="9rem" class="mb-2"></Skeleton>
-                <div v-else class="flex flex-row gap-6">
-                    <div class="flex flex-col items-end leading-tight">
-                        <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.balance') }}</span>
-                        <span class="text-base font-semibold">{{ balance?.balance.toFixed(2) }}</span>
+                <Transition name="fade" mode="out-in">
+                    <Skeleton v-if="!pageReady" width="9rem" class="mb-2"></Skeleton>
+                    <div v-else class="flex flex-row gap-6">
+                        <div class="flex flex-col items-end leading-tight">
+                            <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.balance') }}</span>
+                            <span class="text-base font-semibold">{{ balance?.balance.toFixed(2) }}</span>
+                        </div>
+                        <div class="flex flex-col items-end leading-tight">
+                            <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.portfolio') }}</span>
+                            <span class="text-base font-semibold">{{ portfolioValue?.toFixed(2) }}</span>
+                        </div>
                     </div>
-                    <div class="flex flex-col items-end leading-tight">
-                        <span class="text-xs text-gray-400">{{ tDashboardPage('metrics.portfolio') }}</span>
-                        <span class="text-base font-semibold">{{ portfolioValue?.toFixed(2) }}</span>
-                    </div>
-                </div>
+                </Transition>
                 <Avatar icon="pi pi-user" size="large" style="cursor: pointer" @click="togglePopover" />
                 <Popover ref="op">
                     <div class="flex flex-col w-56">
@@ -65,8 +67,10 @@ const togglePopover = (event: MouseEvent) => {
                         <div class="flex items-center gap-3 p-3">
                             <Avatar icon="pi pi-user" size="large" shape="circle" />
                             <div class="flex flex-col overflow-hidden">
+                                <Transition name="fade" mode="out-in">
                                 <Skeleton v-if="!pageReady" width="8rem" class="mb-2"></Skeleton>
                                 <span v-else class="text-sm font-semibold truncate">{{ user?.email }}</span>
+                            </Transition>
                             </div>
                         </div>
 

@@ -13,9 +13,20 @@ from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.websocket import websocket_connect
 from src.protocols.FIXProtocol import FIXProtocol
 
+class _LoggingAdapter(HTTPAdapter):
+    """HTTPAdapter that prints a message whenever a connection is retried."""
+
+    def send(self, request, **kwargs):
+        try:
+            return super().send(request, **kwargs)
+        except Exception:
+            print(f"[Client] Connection failed, retrying ({request.url})...")
+            raise
+
+
 session = requests.Session()
 retry = Retry(connect=10, backoff_factor=0.5)
-adapter = HTTPAdapter(max_retries=retry)
+adapter = _LoggingAdapter(max_retries=retry)
 
 session.mount('http://', adapter)
 session.mount('https://', adapter)

@@ -927,6 +927,9 @@ def load_data():
         # Restore product manager and user manager states
         max_id_global = 0
         for product, product_data in data.items():
+            if product not in product_manager.order_books:
+                print(f"Warning: product '{product}' from save file not found in current config, skipping.")
+                continue
             order_book_obj = OrderBook()
             order_book, max_id = order_book_obj.from_JSON(
                 product_data["order_books"][-1]
@@ -951,14 +954,12 @@ def save_data():
     """
     data_to_save = {}
     for product in products:
+        order_book = product_manager.get_order_book(product, False)
         report = product_manager.get_historical_order_books(product, -1)
-        report.append(
-            product_manager.get_order_book(product, False).copy().jsonify_order_book()
-        )
-        order_history = product_manager.get_order_book(product, False).order_history
+        report.append(order_book.copy().jsonify_order_book())
         data_to_save[product] = {
             "order_books": report,
-            "order_history": order_history,
+            "order_history": order_book.order_history,
             "users": user_manager.users,
         }
     DATA_DIR.mkdir(parents=True, exist_ok=True)

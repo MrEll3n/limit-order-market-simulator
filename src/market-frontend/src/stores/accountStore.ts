@@ -7,9 +7,9 @@ export const useAccountStore = defineStore('account', () => {
     const balance = ref<Balance | null>(null);
     const orders = ref<Record<string, Order>>({});
     const orderHistory = ref<OrderHistoryEntry[]>([]);
-    const loadingUser = ref(false);
-    const loadingBalance = ref(false);
-    const loadingOrders = ref(false);
+    const loadingUser = ref(true);
+    const loadingBalance = ref(true);
+    const loadingOrders = ref(true);
     const error = ref<string | null>(null);
 
     async function fetchUser(accessToken: string): Promise<boolean> {
