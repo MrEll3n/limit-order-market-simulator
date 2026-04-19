@@ -6,7 +6,7 @@ This project extends the simulator introduced in *Burzovní simulátor pro trh �
 
 The objective is to design, implement, secure, and experimentally validate a multi-asset exchange simulation platform supporting both autonomous and manual trading agents.
 
-![Web Interface](docs/honicoin_cenzor.png)
+![Web Interface](docs/dashboard_preview.png)
 
 ---
 
