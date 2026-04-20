@@ -54,6 +54,8 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
                 time.sleep(random.randint(1, 5))  # Sleep for 1-5 seconds
                 product = random.choice(self.products)
                 order_book = self.order_book_request(product, depth=10)
+                if order_book is None:
+                    continue
                 bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
                 ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
                 if bid_volume == 0 and ask_volume == 0:
