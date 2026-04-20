@@ -304,9 +304,14 @@ def _revoke_all_refresh_tokens(email: str):
 
 def _get_trading_id(email: str):
     """
-    Returns the in-memory trading UUID for a given email, or None.
+    Returns the trading UUID for a given email — memory first, then DB.
     """
-    return _user_manager.user_name_exists(email)
+    tid = _user_manager.user_name_exists(email)
+    if tid:
+        return tid
+    _cursor.execute("SELECT trading_id FROM users WHERE email=?", (email,))
+    row = _cursor.fetchone()
+    return row[0] if row and row[0] else None
 
 
 def _require_auth(handler):
@@ -332,6 +337,9 @@ def _require_auth(handler):
             _json_error(handler, 401, "User not found in database")
             return None, None, None
         trading_id = str(uuid.uuid4())
+        _cursor.execute("UPDATE users SET trading_id=? WHERE email=?", (trading_id, email))
+        _conn.commit()
+    if not _user_manager.user_exists(trading_id):
         _user_manager.add_user(email, trading_id, _INITIAL_BUDGET)
     return email, trading_id, role
 
@@ -524,10 +532,13 @@ class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
         # Revoke ALL existing refresh tokens for this email
         _revoke_all_refresh_tokens(email)
 
-        # Provision trading UUID if not yet in memory
-        trading_id = _user_manager.user_name_exists(email)
+        # Provision stable trading UUID — read from DB, generate once if missing
+        trading_id = _get_trading_id(email)
         if not trading_id:
             trading_id = str(uuid.uuid4())
+            _cursor.execute("UPDATE users SET trading_id=? WHERE email=?", (trading_id, email))
+            _conn.commit()
+        if not _user_manager.user_exists(trading_id):
             _user_manager.add_user(email, trading_id, _INITIAL_BUDGET)
 
         access_token  = _create_access_token(email)

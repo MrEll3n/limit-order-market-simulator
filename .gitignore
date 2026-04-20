@@ -4,8 +4,9 @@
 # Python cache
 **/__pycache__
 
-# Market database
+# Market databases
 src/server/market.db
+src/server/users.db
 
 src/market-frontend/node_modules/
 src/market-frontend/.ruler/

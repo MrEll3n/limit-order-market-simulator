@@ -225,6 +225,11 @@ create_user_db(db_path)  # Create the database and table if they don't exist
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
+# Pre-populate user_manager with all users that already have a stable trading_id
+cursor.execute("SELECT email, trading_id FROM users WHERE trading_id IS NOT NULL")
+for _email, _trading_id in cursor.fetchall():
+    user_manager.add_user(_email, _trading_id, INITIAL_BUDGET)
+
 
 def _verify_fix_api_key(key: str) -> str | None:
     """Verify an API key for FIX endpoints. Returns the email or None if invalid."""
@@ -811,17 +816,20 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.__class__.clients.add(self)
         logging.info("New WebSocket connection")
-        for product in products:
-            snapshot = protocol.encode(
-                {
-                    "order_book": product_manager.get_order_book(
-                        product, False
-                    ).jsonify_order_book(censor=True),
-                    "product": product,
-                    "msg_type": "MarketDataSnapshot",
-                }
-            )
-            self.write_message(json.dumps({"message": snapshot.decode()}))
+        try:
+            for product in products:
+                snapshot = protocol.encode(
+                    {
+                        "order_book": product_manager.get_order_book(
+                            product, False
+                        ).jsonify_order_book(censor=True),
+                        "product": product,
+                        "msg_type": "MarketDataSnapshot",
+                    }
+                )
+                self.write_message(json.dumps({"message": snapshot.decode()}))
+        except tornado.websocket.WebSocketClosedError:
+            logging.warning("WebSocket closed before snapshot could be sent")
 
     def on_close(self):
         """

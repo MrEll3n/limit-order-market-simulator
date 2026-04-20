@@ -35,16 +35,23 @@ def create_user_db(db_path='market.db'):
     # Create the users table if it doesn't exist
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            email    TEXT    NOT NULL UNIQUE,
-            password TEXT    NOT NULL,
-            role     TEXT    NOT NULL DEFAULT 'user' REFERENCES roles(name)
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            email      TEXT    NOT NULL UNIQUE,
+            password   TEXT    NOT NULL,
+            role       TEXT    NOT NULL DEFAULT 'user' REFERENCES roles(name),
+            trading_id TEXT    UNIQUE
         )
     ''')
 
     # Add role column to existing databases that were created before this migration
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
+    except Exception:
+        pass  # Column already exists
+
+    # Add trading_id column to existing databases that were created before this migration
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN trading_id TEXT UNIQUE")
     except Exception:
         pass  # Column already exists
 
