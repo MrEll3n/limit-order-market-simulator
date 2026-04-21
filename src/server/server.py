@@ -36,7 +36,7 @@ from src.order_book.order_book import OrderBook
 from src.order_book.product_manager import TradingProductManager
 from src.protocols.FIXProtocol import FIXProtocol
 from src.server.db_manager import create_user_db
-from src.server.rest_api import REST_ROUTES, init_rest_api
+from src.server.rest_api import REST_ROUTES, init_rest_api, verify_api_key
 from src.server.user_manager import UserManager
 
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -232,12 +232,8 @@ for _email, _trading_id in cursor.fetchall():
 
 
 def _verify_fix_api_key(key: str) -> str | None:
-    """Verify an API key for FIX endpoints. Returns the email or None if invalid."""
-    cursor.execute("SELECT key_hash, email FROM api_keys WHERE active=1")
-    for key_hash, email in cursor.fetchall():
-        if bcrypt.checkpw(key.encode(), key_hash.encode()):
-            return email
-    return None
+    """Verify an API key for FIX endpoints. Delegates to the shared cached implementation."""
+    return verify_api_key(key)
 
 
 protocol = FIXProtocol("server")

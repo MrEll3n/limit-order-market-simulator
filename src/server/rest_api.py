@@ -40,6 +40,7 @@ Routes (all prefixed with /api):
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -425,6 +426,12 @@ class AuditMixin:
 # API key helpers
 # ---------------------------------------------------------------------------
 
+# Cache: sha256(raw_key) -> (email, expires_at)
+# Avoids a full-table bcrypt scan on every authenticated request.
+_API_KEY_CACHE: dict[str, tuple[str, float]] = {}
+_API_KEY_CACHE_TTL = 300  # seconds
+
+
 def _generate_api_key() -> str:
     """Generate a new random API key with a 'sk-' prefix."""
     return "sk-" + secrets.token_hex(32)
@@ -434,16 +441,39 @@ def _hash_api_key(key: str) -> str:
     return bcrypt.hashpw(key.encode(), bcrypt.gensalt()).decode()
 
 
-def _verify_api_key(key: str) -> str | None:
+def _invalidate_api_key_cache_for_email(email: str) -> None:
+    """Remove all cached entries belonging to the given email."""
+    stale = [k for k, (e, _) in _API_KEY_CACHE.items() if e == email]
+    for k in stale:
+        del _API_KEY_CACHE[k]
+
+
+def verify_api_key(key: str) -> str | None:
     """
     Verify an API key and return the associated email, or None if invalid.
-    Checks all stored key hashes (bcrypt compare).
+    Results are cached by SHA-256(key) for _API_KEY_CACHE_TTL seconds so
+    repeated requests skip the full-table bcrypt scan.
     """
+    cache_key = hashlib.sha256(key.encode()).hexdigest()
+    now = time.time()
+
+    cached = _API_KEY_CACHE.get(cache_key)
+    if cached is not None:
+        email, expires_at = cached
+        if now < expires_at:
+            return email
+        del _API_KEY_CACHE[cache_key]
+
     _cursor.execute("SELECT key_hash, email FROM api_keys WHERE active=1")
     for key_hash, email in _cursor.fetchall():
         if bcrypt.checkpw(key.encode(), key_hash.encode()):
+            _API_KEY_CACHE[cache_key] = (email, now + _API_KEY_CACHE_TTL)
             return email
     return None
+
+
+# Keep the private alias for internal callers
+_verify_api_key = verify_api_key
 
 
 # ---------------------------------------------------------------------------
@@ -934,6 +964,7 @@ class AccountApiKeyHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 
         # Deactivate existing key with the same name for this user
         _cursor.execute("UPDATE api_keys SET active=0 WHERE email=? AND name=? AND active=1", (email, name))
+        _invalidate_api_key_cache_for_email(email)
 
         raw_key = _generate_api_key()
         key_hash = _hash_api_key(raw_key)
@@ -983,6 +1014,7 @@ class AccountApiKeyHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         if _cursor.rowcount == 0:
             return _json_error(self, 404, "API key not found")
 
+        _invalidate_api_key_cache_for_email(email)
         _json_ok(self, {"message": "API key revoked"})
 
 
