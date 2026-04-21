@@ -175,9 +175,11 @@
             "toast": {
                 "orderPlaced": "Příkaz zadán",
                 "orderFailed": "Chyba příkazu",
+                "orderCancelled": "Příkaz zrušen",
                 "cancelFailed": "Zrušení selhalo",
                 "orderDetailBuy": "Poptávka za {price}",
-                "orderDetailSell": "Nabídka za {price}"
+                "orderDetailSell": "Nabídka za {price}",
+                "cancelDetail": "Příkaz byl odstraněn z knihy."
             }
         },
         "activeOrders": {
