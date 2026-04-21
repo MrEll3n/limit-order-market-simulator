@@ -249,5 +249,4 @@ Also available [here](http://hdl.handle.net/11025/640100)
 
 - Trading manual: [user_manual.md](https://github.com/MrEll3n/limit-order-market-simulator/blob/main/docs/user_manual.md)
 - Thesis document: [db_2024_25_KIMLOVÁ_Vladimíra.pdf](https://github.com/MrEll3n/limit-order-market-simulator/blob/main/docs/dp_2024_25_KIMLOV%C3%81_Vladim%C3%ADra.pdf)
-- Poster: `docs/DP_poster.pdf`
-- Visualization documentation: `docs/VI.pdf`
+- Poster: [DP_poster.pdf](https://github.com/MrEll3n/limit-order-market-simulator/blob/main/docs/DP_poster.pdf)
