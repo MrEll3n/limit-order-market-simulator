@@ -40,6 +40,8 @@ Routes (all prefixed with /api):
 """
 
 import asyncio
+import concurrent.futures
+import hashlib
 import json
 import logging
 import os
@@ -75,6 +77,16 @@ _CORS_ORIGIN = "http://localhost:3000"  # Vue dev server; overridden by init_res
 _JWT_SECRET: str = ""                    # injected by init_rest_api
 _ACCESS_TOKEN_TTL  = 15 * 60            # 15 minutes  (seconds)
 _REFRESH_TOKEN_TTL = 7  * 24 * 3600    # 7 days       (seconds)
+
+# ---------------------------------------------------------------------------
+# Thread pool for CPU-bound blocking operations (bcrypt hashing/verification)
+# ---------------------------------------------------------------------------
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
+
+async def _run_in_thread(func, *args):
+    return await asyncio.get_event_loop().run_in_executor(_executor, func, *args)
+
 
 # ---------------------------------------------------------------------------
 # Order rate limiter — sliding window, per user
@@ -425,6 +437,12 @@ class AuditMixin:
 # API key helpers
 # ---------------------------------------------------------------------------
 
+# Cache: sha256(raw_key) -> (email, expires_at)
+# Avoids a full-table bcrypt scan on every authenticated request.
+_API_KEY_CACHE: dict[str, tuple[str, float]] = {}
+_API_KEY_CACHE_TTL = 300  # seconds
+
+
 def _generate_api_key() -> str:
     """Generate a new random API key with a 'sk-' prefix."""
     return "sk-" + secrets.token_hex(32)
@@ -434,16 +452,39 @@ def _hash_api_key(key: str) -> str:
     return bcrypt.hashpw(key.encode(), bcrypt.gensalt()).decode()
 
 
-def _verify_api_key(key: str) -> str | None:
+def _invalidate_api_key_cache_for_email(email: str) -> None:
+    """Remove all cached entries belonging to the given email."""
+    stale = [k for k, (e, _) in _API_KEY_CACHE.items() if e == email]
+    for k in stale:
+        del _API_KEY_CACHE[k]
+
+
+def verify_api_key(key: str) -> str | None:
     """
     Verify an API key and return the associated email, or None if invalid.
-    Checks all stored key hashes (bcrypt compare).
+    Results are cached by SHA-256(key) for _API_KEY_CACHE_TTL seconds so
+    repeated requests skip the full-table bcrypt scan.
     """
+    cache_key = hashlib.sha256(key.encode()).hexdigest()
+    now = time.time()
+
+    cached = _API_KEY_CACHE.get(cache_key)
+    if cached is not None:
+        email, expires_at = cached
+        if now < expires_at:
+            return email
+        del _API_KEY_CACHE[cache_key]
+
     _cursor.execute("SELECT key_hash, email FROM api_keys WHERE active=1")
     for key_hash, email in _cursor.fetchall():
         if bcrypt.checkpw(key.encode(), key_hash.encode()):
+            _API_KEY_CACHE[cache_key] = (email, now + _API_KEY_CACHE_TTL)
             return email
     return None
+
+
+# Keep the private alias for internal callers
+_verify_api_key = verify_api_key
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +510,7 @@ class PublicConfigHandler(CORSMixin, tornado.web.RequestHandler):
 class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
     """POST /api/auth/register  — { email, password, confirmPassword }"""
 
-    def post(self):
+    async def post(self):
         try:
             body = json.loads(self.request.body)
         except json.JSONDecodeError:
@@ -491,7 +532,9 @@ class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
         if _cursor.fetchone():
             return _json_error(self, 409, "Email already registered")
 
-        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        hashed = await _run_in_thread(
+            lambda: bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        )
         _cursor.execute(
             "INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed)
         )
@@ -503,7 +546,7 @@ class AuthRegisterHandler(CORSMixin, tornado.web.RequestHandler):
 class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
     """POST /api/auth/login  — { email, password }"""
 
-    def post(self):
+    async def post(self):
         try:
             body = json.loads(self.request.body)
         except json.JSONDecodeError:
@@ -522,7 +565,7 @@ class AuthLoginHandler(CORSMixin, tornado.web.RequestHandler):
 
         stored_hash = row[0]
         try:
-            match = bcrypt.checkpw(password.encode(), stored_hash.encode())
+            match = await _run_in_thread(bcrypt.checkpw, password.encode(), stored_hash.encode())
         except Exception:
             return _json_error(self, 500, "Password verification failed")
 
@@ -920,7 +963,7 @@ class AccountApiKeyHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
     DELETE /api/account/apikey?id=…     – revoke an API key by id
     """
 
-    def post(self):
+    async def post(self):
         email, _, _ = _require_auth(self)
         if not email:
             return
@@ -934,9 +977,10 @@ class AccountApiKeyHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
 
         # Deactivate existing key with the same name for this user
         _cursor.execute("UPDATE api_keys SET active=0 WHERE email=? AND name=? AND active=1", (email, name))
+        _invalidate_api_key_cache_for_email(email)
 
         raw_key = _generate_api_key()
-        key_hash = _hash_api_key(raw_key)
+        key_hash = await _run_in_thread(_hash_api_key, raw_key)
         created_at = int(time.time())
 
         _cursor.execute(
@@ -983,6 +1027,7 @@ class AccountApiKeyHandler(CORSMixin, AuditMixin, tornado.web.RequestHandler):
         if _cursor.rowcount == 0:
             return _json_error(self, 404, "API key not found")
 
+        _invalidate_api_key_cache_for_email(email)
         _json_ok(self, {"message": "API key revoked"})
 
 

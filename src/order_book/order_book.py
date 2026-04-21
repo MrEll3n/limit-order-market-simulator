@@ -28,6 +28,7 @@ class OrderBook:
         }
 
         self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
+        self.user_order_map: dict[str, set] = defaultdict(set)  # user_id -> {order_id, ...}
         self.timestamp = 0  # Timestamp in which the order book was last saved
         self.order_history = {}  # user_id -> list[dict], tracks all orders ever placed
 
@@ -50,6 +51,7 @@ class OrderBook:
         }
 
         self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
+        self.user_order_map = defaultdict(set)
         self.order_history = {}
 
         logging.debug("ORDERBOOK: Order book reset.")
@@ -75,6 +77,7 @@ class OrderBook:
 
         # Keep track of orders
         self.order_map[order.id] = order
+        self.user_order_map[order.user].add(order.id)
         self.order_history.setdefault(order.user, []).append({
             'id': order.id,
             'timestamp': order.timestamp,
@@ -103,6 +106,7 @@ class OrderBook:
                 entry['status'] = 'cancelled'
                 break
         del self.order_map[order_id]
+        self.user_order_map[order.user].discard(order_id)
 
         # Delete the order from the bids or asks
         price_level = self.side_map[order.side]
@@ -130,6 +134,7 @@ class OrderBook:
                 entry['status'] = 'filled'
                 break
         del self.order_map[order.id]
+        self.user_order_map[order.user].discard(order.id)
 
         self.side_map[side][price].popleft()
         if not self.side_map[side][price]:  # Delete the price level if it's empty - no orders at that price
@@ -244,15 +249,11 @@ class OrderBook:
 
     def get_orders_by_user(self, user_id):
         """
-        Get all orders by a user.
+        Get all active orders by a user.
         :param user_id: User ID
         :return: List of orders by the user
         """
-        user_orders = []
-        for order in self.order_map.values():
-            if order.user == user_id:
-                user_orders.append(order)
-        return user_orders
+        return [self.order_map[oid] for oid in self.user_order_map.get(user_id, ())]
 
     def get_user_balance(self, user_id):
         """

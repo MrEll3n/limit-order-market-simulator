@@ -36,7 +36,7 @@ from src.order_book.order_book import OrderBook
 from src.order_book.product_manager import TradingProductManager
 from src.protocols.FIXProtocol import FIXProtocol
 from src.server.db_manager import create_user_db
-from src.server.rest_api import REST_ROUTES, init_rest_api
+from src.server.rest_api import REST_ROUTES, init_rest_api, verify_api_key
 from src.server.user_manager import UserManager
 
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -223,6 +223,9 @@ if not os.path.exists(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 create_user_db(db_path)  # Create the database and table if they don't exist
 conn = sqlite3.connect(db_path)
+conn.execute("PRAGMA journal_mode = WAL")
+conn.execute("PRAGMA synchronous = NORMAL")
+conn.execute("PRAGMA foreign_keys = ON")
 cursor = conn.cursor()
 
 # Pre-populate user_manager with all users that already have a stable trading_id
@@ -232,12 +235,8 @@ for _email, _trading_id in cursor.fetchall():
 
 
 def _verify_fix_api_key(key: str) -> str | None:
-    """Verify an API key for FIX endpoints. Returns the email or None if invalid."""
-    cursor.execute("SELECT key_hash, email FROM api_keys WHERE active=1")
-    for key_hash, email in cursor.fetchall():
-        if bcrypt.checkpw(key.encode(), key_hash.encode()):
-            return email
-    return None
+    """Verify an API key for FIX endpoints. Delegates to the shared cached implementation."""
+    return verify_api_key(key)
 
 
 protocol = FIXProtocol("server")
