@@ -15,7 +15,7 @@ import { orderMidPricePlugin, getOrderHistogramOptions, obMidPricePlugin, getObH
 
 // Locale
 const { t } = useI18n();
-const tDashboardPage = (key: string) => t(`dashboardPage.${key}`);
+const tDashboardPage = (key: string, values?: Record<string, unknown>) => t(`dashboardPage.${key}`, values ?? {});
 
 // Auth
 const { clearAuthAndRedirect, getAuthData, refreshAccessToken } = useAuth();
@@ -343,6 +343,7 @@ const cancelOrder = async (orderId: string) => {
             headers: { Authorization: `Bearer ${authData.accessToken}` },
         });
         if (res.ok) {
+            showSuccess({ label: tDashboardPage('tradingPanel.toast.orderCancelled'), detail: tDashboardPage('tradingPanel.toast.cancelDetail') });
             await Promise.all([
                 accountStore.fetchOrders(authData.accessToken, selectedProduct.value, { silent: true }),
                 accountStore.fetchBalance(authData.accessToken, { silent: true }),
@@ -626,7 +627,6 @@ onMounted(async () => {
                     </Transition>
                 </Fieldset>
             </div>
-            <Toast />
         </div>
     </div>
 </template>

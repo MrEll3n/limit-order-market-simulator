@@ -175,9 +175,11 @@
             "toast": {
                 "orderPlaced": "Order placed",
                 "orderFailed": "Order failed",
+                "orderCancelled": "Order cancelled",
                 "cancelFailed": "Cancel failed",
                 "orderDetailBuy": "Bid at {price}",
-                "orderDetailSell": "Ask at {price}"
+                "orderDetailSell": "Ask at {price}",
+                "cancelDetail": "The order has been removed."
             }
         },
         "activeOrders": {
