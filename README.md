@@ -245,7 +245,7 @@ Supervisor: J. Pospíšil.
 
 ## Documentation
 
-- Trading manual: `docs/Trading_manual.pdf`
+- Trading manual: [user_manual.md](https://github.com/MrEll3n/limit-order-market-simulator/blob/main/docs/user_manual.md)
 - Thesis document: `docs/dp_2024_25_KIMLOVÁ_Vladimíra.pdf`
 - Poster: `docs/DP_poster.pdf`
 - Visualization documentation: `docs/VI.pdf`
