@@ -223,6 +223,9 @@ if not os.path.exists(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 create_user_db(db_path)  # Create the database and table if they don't exist
 conn = sqlite3.connect(db_path)
+conn.execute("PRAGMA journal_mode = WAL")
+conn.execute("PRAGMA synchronous = NORMAL")
+conn.execute("PRAGMA foreign_keys = ON")
 cursor = conn.cursor()
 
 # Pre-populate user_manager with all users that already have a stable trading_id
