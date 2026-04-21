@@ -4,20 +4,20 @@
 ## Table of Content
 
 - [About](#about) 
-- [Getting Started](#getting%20started)
+- [Getting Started](#getting-started)
 - [Dashboard](#dashboard)
-	- [Active Orders](#active%20orders)
-	- [Price Chart](#price%20chart)
-	- [Trading Details](#trading%20details)
-	- [Order History](#order%20history)
-	- [Trading Panel](#trading%20panel)
-	- [Top Panel](#top%20panel)
-- [Tips for using the simulator](#tips%20for%20using%20the%20simulator)
-- [Using python agent](#using%20python%20agent)
-	- [handle_market_data(self, message)](#handle_market_data(self%20message))
-	- [trade(self, message)](#trade(self%20message))
-	- [Agent Deploy](#agent%20deploy)
-	- [Other ways to trade with agent](#other%20ways%20to%20trade%20with%20agent)
+	- [Active Orders](#active-orders)
+	- [Price Chart](#price-chart)
+	- [Trading Details](#trading-details)
+	- [Order History](#order-history)
+	- [Trading Panel](#trading-panel)
+	- [Top Panel](#top-panel)
+- [Tips for using the simulator](#tips-for-using-the-simulator)
+- [Using python agent](#using-python-agent)
+	- [handle_market_data method](#handle_market_data-method)
+	- [trade method](#trade-method)
+	- [Agent Deploy](#agent-deploy)
+	- [Other ways to trade with agent](#other-ways-to-trade-with-agent)
 
 ---
 ## About
@@ -35,7 +35,7 @@ Before we dive into vast world of stock trading, best price hunting and graph ga
 
 To create an account, go to https://honicoin.site/register where you may insert email and password with verification and continue with register process
 
-![Figure 1: Register page preview][register_page_preview.png]
+![Figure 1: Register page preview](user_manual/img/register_page_preview.png)
 
 This way, you will be redirected to login page, where you may continue to sign-in.
 
@@ -44,7 +44,7 @@ This way, you will be redirected to login page, where you may continue to sign-i
 
 Every important action is done in this dashboard below
 
-![Figure 2: Dashboard preview][Dashbord_preview.png]
+![Figure 2: Dashboard preview](user_manual/img/Dashbord_preview.png)
 >Overview of Honicoin Crypto Dashboard showing various panels containing trading information
 
 ---
@@ -61,7 +61,7 @@ It provides an overview of the market’s ongoing activity, showing the prices a
 - **Bid price** refers to the highest price that buyers are willing to pay for a stock. 
 - **Ask price** refers to the lowest price that sellers are willing to accept for a stock.
 
-![Figure 3: Active orders][active_orders_preview.png]
+![Figure 3: Active orders](user_manual/img/active_orders_preview.png)
 >Active Orders
 
 ---
@@ -76,7 +76,7 @@ The price chart panel right in the middle of the screen shows the movement of st
 
 Use this chart to track market trends and to time your entries and exits into the market. The closer the bid and ask prices are to each other, the higher the liquidity in the market, meaning it is easier to buy and sell shares quickly.
 
-![Figure 4: Price Chart][price_chart_preview.png]
+![Figure 4: Price Chart](user_manual/img/price_chart_preview.png)
 >Price Chart showing last hour of price changes
 
 ---
@@ -91,7 +91,7 @@ On the left bottom corner, there is Trading Details panel, which shows current *
 
 In the middle bottom you can find logs with details of your previous orders. These details consists of **Side (Buy / Sell)**, **Price**, **Quantity (Qty)**, **Order status** and **Time**.
 
-![Figure 5: Order History][order_history_preview.png]
+![Figure 5: Order History](user_manual/img/order_history_preview.png)
 >Order History filled with cancelled orders
 
 ---
@@ -103,7 +103,7 @@ This section contains the tools needed to interact with the market, including
 - Price
 - Quantity
 
-![Figure 6: Trading Panel][trading_panel_preview.png]
+![Figure 6: Trading Panel](user_manual/img/trading_panel_preview.png)
 
 ---
 ### Top Panel
@@ -117,7 +117,7 @@ The top panel conveniently located at the top displays:
 	- Language switch
 	- Logout button
  
-![Figure 7: Top Panel][top_panel_preview.png]
+![Figure 7: Top Panel](user_manual/img/top_panel_preview.png)
 
 ---
 ## Tips for using the simulator
@@ -184,11 +184,11 @@ You can use two methods of logging into platform with an Agent:
 curl -X POST https://honicoin.site/api/account/apikey \ -H "Authorization: Bearer YOUR_API_KEY" \ -H "Content-Type: application/json" \ -d '{"name": "api-key-name"}'
 ```
 
-### handle_market_data(self, message)
+### handle_market_data method
 
 This method is designated for processing and analyzing market data before trading.
 
-### trade(self, message)
+### trade method
 
 Trading logic where you can specify parameters for agent to decide when to buy or sell stocks, which stock and how many units.
 
