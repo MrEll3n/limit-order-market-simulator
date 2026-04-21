@@ -11,6 +11,8 @@ def create_user_db(db_path='market.db'):
 
     # Connect to the SQLite database (or create it if it doesn't exist)
     conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
