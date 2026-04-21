@@ -2,7 +2,8 @@
 
 A multi-product exchange simulator for a limit order book (LOB) driven market.
 
-This project extends the simulator introduced in *Burzovní simulátor pro trh řízený limitními objednávkami* (Kimlová, 2025, University of West Bohemia).
+This project extends the simulator introduced in *Burzovní simulátor pro trh řízený limitními objednávkami*. 
+>KIMLOVÁ, Vladimíra. Burzovní simulátor pro trh ́řízený limitníımi objednávkami. Západočeská univerzita v Plzni, 2025. Also available [here](http://hdl.handle.net/11025/640100).
 
 The objective is to design, implement, secure, and experimentally validate a multi-asset exchange simulation platform supporting both autonomous and manual trading agents.
 
