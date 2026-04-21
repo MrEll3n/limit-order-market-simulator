@@ -241,6 +241,8 @@ Kimlová, V. (2025).
 University of West Bohemia, Faculty of Applied Sciences.  
 Supervisor: J. Pospíšil.
 
+Also available [here](http://hdl.handle.net/11025/640100)
+
 ---
 
 ## Documentation
