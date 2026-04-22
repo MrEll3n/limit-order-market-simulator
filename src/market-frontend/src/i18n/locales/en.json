@@ -141,7 +141,8 @@
         },
         "userMenu": {
             "theme": "Theme",
-            "language": "Language"
+            "language": "Language",
+            "wiki": "User Guide"
         },
         "panels": {
             "activeOrders": "Active Orders",
