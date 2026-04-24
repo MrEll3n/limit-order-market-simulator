@@ -402,7 +402,7 @@ const placeOrder = async () => {
 
 onMounted(async () => {
     loadingChart.value = true;
-    const authData = getAuthData();
+    let authData = getAuthData();
     if (!authData?.accessToken) {
         clearAuthAndRedirect();
         return;
@@ -415,6 +415,10 @@ onMounted(async () => {
             clearAuthAndRedirect();
             return;
         }
+        // Re-read auth data so subsequent calls use the new token
+        const newAuthData = getAuthData();
+        if (!newAuthData?.accessToken) { clearAuthAndRedirect(); return; }
+        authData = newAuthData;
     }
 
     await marketStore.fetchProducts();
