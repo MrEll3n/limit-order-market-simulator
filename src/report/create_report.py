@@ -117,15 +117,17 @@ def _sort_product_data(product_data):
             ud["volume"] = new_vol
 
 
-def compute_statistics(users, products, initial_budget=10000):
+def compute_statistics(users, products, initial_budget=10000, excluded_emails=None):
     """
     Compute statistics for each user across all products.
 
     :param users: Global user dict from load_data.
     :param products: Per-product dict from load_data.
     :param initial_budget: Starting budget.
+    :param excluded_emails: Optional list of user emails (names) to exclude from statistics.
     :return: (DataFrame of stats, total stock fee income)
     """
+    excluded = set(excluded_emails or [])
     stats = []
     stock_income = 0
 
@@ -135,6 +137,9 @@ def compute_statistics(users, products, initial_budget=10000):
             "market_maker",
             "liquidity_generator",
         ):
+            continue
+
+        if name in excluded or user_id in excluded:
             continue
 
         stock_income += initial_budget - user_info.get("budget", initial_budget)
@@ -178,7 +183,7 @@ def compute_statistics(users, products, initial_budget=10000):
     return pd.DataFrame(stats), stock_income
 
 
-def create_results_table(users, products, censor=False, top_n=10):
+def create_results_table(users, products, censor=False, top_n=10, excluded_emails=None):
     """
     Create a results table with statistics for each user and save it to a file.
 
@@ -186,9 +191,15 @@ def create_results_table(users, products, censor=False, top_n=10):
     :param products: Per-product dict from load_data.
     :param censor: Boolean flag to censor user UUIDs.
     :param top_n: Number of top users to display.
+    :param excluded_emails: Optional list of user emails (names) to exclude from the report.
     :return: (stats DataFrame, top_n DataFrame)
     """
-    stats_df, stock_income = compute_statistics(users, products)
+    if excluded_emails:
+        print("Excluded emails:")
+        for email in excluded_emails:
+            print(f"  - {email}")
+
+    stats_df, stock_income = compute_statistics(users, products, excluded_emails=excluded_emails)
     stats_df = stats_df.round(2)
 
     stats_df = stats_df.sort_values(by="FinalBalance", ascending=False)
