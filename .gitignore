@@ -7,6 +7,8 @@
 # Market databases
 src/server/market.db
 src/server/users.db
+src/server/market.db-shm
+src/server/market.db-wal
 
 src/market-frontend/node_modules/
 src/market-frontend/.ruler/

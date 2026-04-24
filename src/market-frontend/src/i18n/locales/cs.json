@@ -141,7 +141,8 @@
         },
         "userMenu": {
             "theme": "Motiv",
-            "language": "Jazyk"
+            "language": "Jazyk",
+            "wiki": "Uživatelská příručka"
         },
         "panels": {
             "activeOrders": "Aktivní objednávky",

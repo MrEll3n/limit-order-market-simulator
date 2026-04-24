@@ -100,8 +100,17 @@ const togglePopover = (event: MouseEvent) => {
 
                         <Divider class="my-0" />
 
-                        <!-- Logout -->
+                        <!-- Wiki & Logout -->
                         <div class="px-1 py-1">
+                            <a
+                                href="https://github.com/MrEll3n/limit-order-market-simulator/wiki/Honicoin-Crypto-User-Manual"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-surface-100 dark:hover:bg-surface-700 no-underline text-inherit w-full"
+                            >
+                                <i class="pi pi-github text-surface-400" />
+                                <span>{{ tDashboardPage('userMenu.wiki') }}</span>
+                            </a>
                             <Button
                                 :label="tDashboardPage('actions.logout')"
                                 icon="pi pi-sign-out"
