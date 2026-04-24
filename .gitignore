@@ -20,5 +20,5 @@ src/market-frontend/target/
 **/statistics.html
 **/statistics.csv
 **/best_traders_plot.html
-**/best_traders_plog.pdf
-**/best_tradesr_plog.png
+**/best_traders_plot.pdf
+**/best_traders_plot.png
