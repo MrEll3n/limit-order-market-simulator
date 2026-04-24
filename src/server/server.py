@@ -866,10 +866,10 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
                 try:
                     await client.write_message(json.dumps(message_data))
                 except tornado.websocket.WebSocketClosedError:
-                    logging.error("WebSocketClosedError during broadcast")
+                    logging.warning("WebSocketClosedError during broadcast")
                     closed_clients.add(client)
                 except tornado.iostream.StreamClosedError:
-                    logging.error("StreamClosedError during broadcast")
+                    logging.warning("StreamClosedError during broadcast")
                     closed_clients.add(client)
 
             # Remove all closed clients after the loop

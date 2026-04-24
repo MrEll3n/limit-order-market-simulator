@@ -278,12 +278,14 @@ watch(wsData, (raw) => {
 });
 
 // Initial history from REST API
-const fetchChartHistory = async (product: string, historyLength: number = -1) => {
+const fetchChartHistory = async (product: string, historyLength: number = -1, since: number | null = (Date.now() - 86_400_000) * 1_000_000) => {
     loadingChart.value = true;
     try {
         const authData = getAuthData();
         if (!authData?.accessToken) { clearAuthAndRedirect(); return; }
-        const res = await fetch(`/api/market/report?product=${product}&history_len=${historyLength}`, {
+        const params = new URLSearchParams({ product, history_len: String(historyLength) });
+        if (since !== null) params.set('since', String(since));
+        const res = await fetch(`/api/market/report?${params}`, {
             headers: { Authorization: `Bearer ${authData.accessToken}` },
         });
         if (!res.ok) return;

@@ -24,7 +24,7 @@ Routes (all prefixed with /api):
   Market data (public)
     GET    /api/market/products
     GET    /api/market/orderbook?product=...&depth=...
-    GET    /api/market/report?product=...&history_len=...
+    GET    /api/market/report?product=...&history_len=...&since=...
 
   Orders  (requires auth — Bearer token)
     POST   /api/orders                     – place new order
@@ -704,7 +704,7 @@ class MarketOrderBookHandler(CORSMixin, tornado.web.RequestHandler):
 
 
 class MarketReportHandler(CORSMixin, tornado.web.RequestHandler):
-    """GET /api/market/report?product=...&history_len=..."""
+    """GET /api/market/report?product=...&history_len=...&since=..."""
 
     def get(self):
         email, _user_id, role = _require_auth(self)
@@ -727,7 +727,9 @@ class MarketReportHandler(CORSMixin, tornado.web.RequestHandler):
             return data
 
         history_len = int(self.get_argument("history_len", -1))
-        report = [_process(ob) for ob in _product_manager.get_historical_order_books(product, history_len)]
+        since_arg = self.get_argument("since", None)
+        since = int(since_arg) if since_arg is not None else None
+        report = [_process(ob) for ob in _product_manager.get_historical_order_books(product, history_len, since)]
         report.append(_process(_product_manager.get_order_book(product, False).copy().jsonify_order_book()))
         _json_ok(self, {"product": product, "history": report})
 
