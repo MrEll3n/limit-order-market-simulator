@@ -592,8 +592,14 @@ class FIXProtocol(IProtocol):
         :param data: FIX message
         :return: Dictionary with product name
         """
-        user = data.get(49).decode()
-        product = data.get(55).decode()  # Symbol (used as product name)
+        raw_user = data.get(49)
+        raw_product = data.get(55)
+        if raw_user is None:
+            raise ValueError("Missing required FIX tag 49 (SenderCompID) in UserBalanceRequest")
+        if raw_product is None:
+            raise ValueError("Missing required FIX tag 55 (Symbol) in UserBalanceRequest")
+        user = raw_user.decode()
+        product = raw_product.decode()
         return {"user": user, "product": product}
 
     @staticmethod
@@ -603,9 +609,14 @@ class FIXProtocol(IProtocol):
         :param data: FIX message
         :return: Dictionary with product name
         """
-        product = data.get(55).decode()  # Symbol (used as product name)
+        raw_user = data.get(49)
+        raw_product = data.get(55)
+        if raw_user is None:
+            raise ValueError("Missing required FIX tag 49 (SenderCompID) in CaptureReportRequest")
+        if raw_product is None:
+            raise ValueError("Missing required FIX tag 55 (Symbol) in CaptureReportRequest")
         history_len = int(data.get(568).decode())
-        return {"product": product, "history_len": history_len, "user": data.get(49).decode()}
+        return {"product": raw_product.decode(), "history_len": history_len, "user": raw_user.decode()}
 
     def decode(self, message):
         """

@@ -1,3 +1,5 @@
+import json
+
 from order_book.matching_engine import FIFOMatchingEngine
 from order_book.order_book import OrderBook
 
@@ -52,13 +54,18 @@ class TradingProductManager:
         self.historical_order_books[product].append(self.order_books[product].copy().jsonify_order_book())
         return self.matching_engines.get(product)
 
-    def get_historical_order_books(self, product, history_length):
+    def get_historical_order_books(self, product, history_length, since=None):
         """
         Retrieves the historical order books for a given product. If history_length is -1, it returns all historical data.
         :param product: Name of the product.
         :param history_length: Length of history to retrieve. If -1, returns all historical data.
+        :param since: Optional Unix timestamp in nanoseconds; only records with Timestamp >= since are returned.
         :return: List of historical order books for the specified product.
         """
         if history_length == -1:
-            return list(self.historical_order_books[product])
-        return self.historical_order_books[product][-history_length:]
+            books = list(self.historical_order_books[product])
+        else:
+            books = self.historical_order_books[product][-history_length:]
+        if since is not None:
+            books = [b for b in books if json.loads(b).get("Timestamp", 0) >= since]
+        return books

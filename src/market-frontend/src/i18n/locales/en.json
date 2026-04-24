@@ -157,7 +157,7 @@
             "zoom": {
                 "minute": "Minute",
                 "hour": "Hour",
-                "all": "All"
+                "all": "Day"
             },
             "selectProduct": "Select product",
             "traces": {
