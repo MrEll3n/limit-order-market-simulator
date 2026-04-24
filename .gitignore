@@ -14,3 +14,11 @@ src/market-frontend/node_modules/
 src/market-frontend/.ruler/
 src/market-frontend/target/
 .env
+
+# Report cache
+**/.ipynb_checkpoints
+**/statistics.html
+**/statistics.csv
+**/best_traders_plot.html
+**/best_traders_plog.pdf
+**/best_tradesr_plog.png

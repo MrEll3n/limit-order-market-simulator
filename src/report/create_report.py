@@ -1,11 +1,10 @@
 import json
 import pickle
+
 import numpy as np
 import pandas as pd
-import plotly_resampler
-from plotly_resampler import FigureResampler
-from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 def load_data(file_paths):
@@ -25,12 +24,16 @@ def load_data(file_paths):
 
     for file_path in file_paths:
         print(f"Processing file: {file_path}")
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             data = pickle.load(f)
 
         for product, order_books in data.items():
             if product not in products:
-                products[product] = {"timestamps": [], "mid_prices": [], "user_data": {}}
+                products[product] = {
+                    "timestamps": [],
+                    "mid_prices": [],
+                    "user_data": {},
+                }
 
             _extract_product_data(order_books, products[product], users)
 
@@ -68,7 +71,9 @@ def _extract_product_data(order_books, product_data, users):
         for user_id, balance_data in ob["UserBalance"].items():
             if user_id not in product_data["user_data"]:
                 product_data["user_data"][user_id] = {"balance": [], "volume": []}
-            product_data["user_data"][user_id]["balance"].append(balance_data["balance"])
+            product_data["user_data"][user_id]["balance"].append(
+                balance_data["balance"]
+            )
             product_data["user_data"][user_id]["volume"].append(balance_data["volume"])
 
 
@@ -98,7 +103,9 @@ def _sort_product_data(product_data):
             pass
         else:
             # Partial history: keep tail entries aligned with the last n timestamps
-            tail = sort_idx[n_filtered - bal_len:] if bal_len <= n_filtered else sort_idx
+            tail = (
+                sort_idx[n_filtered - bal_len :] if bal_len <= n_filtered else sort_idx
+            )
             # Remap using position in sort_idx
             pos_map = {orig: new for new, orig in enumerate(sort_idx)}
             new_bal, new_vol = [], []
@@ -124,7 +131,10 @@ def compute_statistics(users, products, initial_budget=10000):
 
     for user_id, user_info in users.items():
         name = user_info.get("name", user_id)
-        if user_id in ("market_maker", "liquidity_generator") or name in ("market_maker", "liquidity_generator"):
+        if user_id in ("market_maker", "liquidity_generator") or name in (
+            "market_maker",
+            "liquidity_generator",
+        ):
             continue
 
         stock_income += initial_budget - user_info.get("budget", initial_budget)
@@ -148,16 +158,22 @@ def compute_statistics(users, products, initial_budget=10000):
                     final_balance += ud["volume"][-1] * last_mid
 
         pnl = final_balance - initial_budget
-        stats.append({
-            "User": user_id,
-            "Name": name,
-            "FinalBalance": final_balance,
-            "Return (%)": (pnl / initial_budget) * 100 if initial_budget else 0,
-            "AvgVolumePerStep": np.mean(total_volume_series) if total_volume_series else 0,
-            "MaxVolume": max(total_volume_series, default=0),
-            "AvgBalance": np.mean(total_balance_series) if total_balance_series else 0,
-            "NumOrders": user_info.get("num_orders", 0),
-        })
+        stats.append(
+            {
+                "User": user_id,
+                "Name": name,
+                "FinalBalance": final_balance,
+                "Return (%)": (pnl / initial_budget) * 100 if initial_budget else 0,
+                "AvgVolumePerStep": np.mean(total_volume_series)
+                if total_volume_series
+                else 0,
+                "MaxVolume": max(total_volume_series, default=0),
+                "AvgBalance": np.mean(total_balance_series)
+                if total_balance_series
+                else 0,
+                "NumOrders": user_info.get("num_orders", 0),
+            }
+        )
 
     return pd.DataFrame(stats), stock_income
 
@@ -186,17 +202,21 @@ def create_results_table(users, products, censor=False, top_n=10):
 
     stats_df = stats_df.reset_index(drop=True)
     stats_df.index = stats_df.index + 1
-    stats_df = stats_df.rename(columns={
-        "FinalBalance": "Final Balance",
-        "AvgVolumePerStep": "Avg Volume Per Step",
-        "MaxVolume": "Max Volume",
-        "AvgBalance": "Avg Balance",
-        "NumOrders": "Num Orders",
-    })
+    stats_df = stats_df.rename(
+        columns={
+            "FinalBalance": "Final Balance",
+            "AvgVolumePerStep": "Avg Volume Per Step",
+            "MaxVolume": "Max Volume",
+            "AvgBalance": "Avg Balance",
+            "NumOrders": "Num Orders",
+        }
+    )
 
     print(f"Stock fee income: {stock_income}")
 
-    stats_df.to_html("statistics.html", index=False, justify="right", float_format="%.2f")
+    stats_df.to_html(
+        "statistics.html", index=False, justify="right", float_format="%.2f"
+    )
     stats_df.to_csv("statistics.csv", index=False, float_format="%.2f")
 
     return stats_df, top_n_df
@@ -213,76 +233,158 @@ def plot_best_traders_interactive(users, products, top_n, censor=False):
     """
     product_names = list(products.keys())
     n_products = len(product_names)
+    n_rows = n_products * 2
 
-    base_fig = make_subplots(
-        rows=1,
-        cols=n_products,
-        subplot_titles=product_names,
-        specs=[[{"secondary_y": True}] * n_products],
-        shared_xaxes=False,
-    )
-
-    fig = FigureResampler(
-        base_fig,
-        default_downsampler=plotly_resampler.MinMaxLTTB(parallel=True),
-    )
-
-    for col_idx, product in enumerate(product_names, start=1):
+    # Pre-compute per-product timestamp metadata
+    product_meta = {}
+    for product in product_names:
         product_data = products[product]
-        timestamps = pd.to_datetime(product_data["timestamps"], unit="ns")
-        mid_prices = product_data["mid_prices"]
-        last_mid = next((p for p in reversed(mid_prices) if p is not None), None)
+        raw_timestamps = pd.to_datetime(product_data["timestamps"], unit="ns").floor("us")
+        raw_mid_prices = product_data["mid_prices"]
+        first_valid = next(
+            (i for i in range(len(raw_mid_prices)) if raw_mid_prices[i] is not None), 0
+        )
+        last_valid = next(
+            (i for i in range(len(raw_mid_prices) - 1, -1, -1) if raw_mid_prices[i] is not None),
+            len(raw_mid_prices) - 1,
+        )
+        timestamps = raw_timestamps[: last_valid + 1]
+        mid_prices = raw_mid_prices[: last_valid + 1]
+        product_meta[product] = {
+            "raw_timestamps": raw_timestamps,
+            "timestamps": timestamps,
+            "mid_prices": mid_prices,
+            "last_mid": mid_prices[last_valid],
+            "x_start": raw_timestamps[first_valid].isoformat(),
+            "x_end": raw_timestamps[last_valid].isoformat(),
+        }
 
-        # User balance traces (primary y-axis)
-        for user_id in top_n["User"].values:
-            ud = product_data["user_data"].get(user_id)
-            if not ud or not ud["balance"]:
-                continue
+    # Subplot titles: grouped by product
+    subplot_titles = [
+        title
+        for p in product_names
+        for title in (f"{p} — Balance", f"{p} — Portfolio")
+    ]
 
-            volume = np.array(ud["volume"])
-            balance = np.array(ud["balance"]) + volume * (last_mid or 0)
+    fig = make_subplots(
+        rows=n_rows,
+        cols=1,
+        subplot_titles=subplot_titles,
+        specs=[[{"secondary_y": True}]] * n_rows,
+        shared_xaxes=False,
+        vertical_spacing=0.12,
+    )
 
-            # Pad with zeros at the start if user joined after simulation began
-            if len(balance) < len(timestamps):
-                balance = np.concatenate((np.zeros(len(timestamps) - len(balance)), balance))
+    # mode: "balance" = cash only, "portfolio" = cash + stocks * last_mid
+    for prod_idx, product in enumerate(product_names):
+        for mode_idx, mode in enumerate(["balance", "portfolio"]):
+            row_idx = prod_idx * 2 + mode_idx + 1
+            is_first_row = row_idx == 1
+            meta = product_meta[product]
+            product_data = products[product]
+            timestamps = meta["timestamps"]
+            mid_prices = meta["mid_prices"]
+            last_mid = meta["last_mid"]
 
-            user_name = (
-                f"{user_id[:4]}...{user_id[-4:]}" if censor
-                else users[user_id]["name"]
-            )
+            for user_id in top_n["User"].values:
+                ud = product_data["user_data"].get(user_id)
+                if not ud or not ud["balance"]:
+                    continue
+
+                cash = np.array(ud["balance"])
+                volume = np.array(ud["volume"])
+                if mode == "portfolio":
+                    y = cash + volume * (last_mid or 0)
+                else:
+                    y = cash
+
+                n = len(timestamps)
+                if len(y) < n:
+                    y = np.concatenate((np.zeros(n - len(y)), y))
+                elif len(y) > n:
+                    y = y[-n:]
+
+                user_name = (
+                    f"{user_id[:4]}...{user_id[-4:]}" if censor else users[user_id]["name"]
+                )
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=timestamps,
+                        y=y,
+                        mode="lines",
+                        name=user_name,
+                        legendgroup=user_name,
+                        showlegend=is_first_row,
+                    ),
+                    row=row_idx,
+                    col=1,
+                    secondary_y=False,
+                )
 
             fig.add_trace(
-                go.Scatter(x=timestamps, y=balance, mode="lines",
-                           name=f"{user_name} ({product})", showlegend=True),
-                row=1, col=col_idx, secondary_y=False,
+                go.Scatter(
+                    x=timestamps,
+                    y=mid_prices,
+                    mode="lines",
+                    name="Mid Price",
+                    legendgroup="Mid Price",
+                    line=dict(color="black"),
+                    opacity=0.5,
+                    showlegend=is_first_row,
+                ),
+                row=row_idx,
+                col=1,
+                secondary_y=True,
             )
 
-        # Mid-price trace (secondary y-axis)
-        fig.add_trace(
-            go.Scatter(x=timestamps, y=mid_prices, mode="lines",
-                       name=f"Mid Price ({product})",
-                       line=dict(color="black"), opacity=0.5, showlegend=True),
-            row=1, col=col_idx, secondary_y=True,
-        )
+            y_label = "Portfolio Value" if mode == "portfolio" else "Cash Balance"
+            fig.update_xaxes(
+                title_text="Time",
+                title_font=dict(size=14),
+                tickangle=-45,
+                nticks=10,
+                range=[meta["x_start"], meta["x_end"]],
+                autorange=False,
+                tickformat="%b %d\n%H:%M",
+                row=row_idx,
+                col=1,
+            )
+            fig.update_yaxes(
+                title_text=y_label,
+                title_font=dict(size=14),
+                row=row_idx,
+                col=1,
+                secondary_y=False,
+            )
+            fig.update_yaxes(
+                title_text="Mid Price",
+                title_font=dict(size=14),
+                row=row_idx,
+                col=1,
+                secondary_y=True,
+            )
 
-        # Axis labels
-        fig.update_xaxes(title_text="Time", title_font=dict(size=14), row=1, col=col_idx)
-        fig.update_yaxes(title_text="Balance", title_font=dict(size=14),
-                         row=1, col=col_idx, secondary_y=False)
-        fig.update_yaxes(title_text="Mid Price", title_font=dict(size=14),
-                         row=1, col=col_idx, secondary_y=True)
+    n_traces = len(top_n) + 1
+    legend_rows = max(1, -(-n_traces // 2))
+    legend_height_px = legend_rows * 25
+    chart_height = max(500, 450 * n_rows)
+    top_margin = legend_height_px + 120
 
-    legend_y = 1.4 if censor else 1.3
     fig.update_layout(
-        title=dict(text="Balance of Best Traders Over Time", font=dict(size=20)),
-        legend=dict(orientation="h", x=0.5, y=legend_y, xanchor="center", font=dict(size=13)),
-        margin=dict(l=50, r=50, t=180, b=50),
-        height=500,
-        width=max(800, 450 * n_products),
+        title=dict(text="Balance of Best Traders Over Time", font=dict(size=20), y=1.0, yanchor="top"),
+        legend=dict(
+            orientation="h",
+            x=0.5,
+            xanchor="center",
+            y=1.05,
+            yanchor="bottom",
+            font=dict(size=13),
+        ),
+        margin=dict(l=50, r=50, t=top_margin, b=80),
+        height=chart_height,
+        width=900,
     )
-
-    for trace in fig.data:
-        trace.name = trace.name.split("~")[0].strip().replace("[R]", "").strip()
 
     fig.show()
     fig.write_html("best_traders_plot.html")
