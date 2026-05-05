@@ -81,7 +81,6 @@ The simulator is modular and consists of the following components:
 
 - Statistical post-processing of simulation runs.
 - Comparative analysis of strategies.
-- Cross-product performance evaluation.
 
 ---
 
