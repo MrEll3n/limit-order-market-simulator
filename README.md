@@ -224,15 +224,6 @@ The notebook allows:
 
 ---
 
-## Running Tests
-
-```bash
-cd tests
-python -m unittest tests.py
-```
-
----
-
 ## Reference
 
 Kimlová, V. (2025).  
